@@ -4,7 +4,7 @@ Storefront (e-commerce) domain of the retail-network organisation, bounded conte
 
 Owns what a shopper pays: the list price and sale windows per catalogue item, the delivery charge per service tier, a synthetic tax table, and the binding, immutable, expiring PriceQuote a checkout session is confirmed against. One configured currency, integer minor units; promotions are a later phase (D10).
 
-Status: under construction. The design lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) `storefront/model/model.yaml` (single source of truth).
+Status: built (REST API, outbox relay, offer-availability consumer, policies). The design lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) `storefront/model/model.yaml` (single source of truth).
 This repository is part of the storefront domain: it consumes the retail network's Open Host Service routes and its
 published `retailnetwork.*` events; it never calls an in-org or restricted network route.
 
@@ -16,3 +16,9 @@ Runtime: Go, hexagonal, real PostgreSQL and Kafka only (`DATABASE_URL`, `KAFKA_B
 This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
 
 See `docs/adr/` for decisions and `docs/before-first-release.md` for the packaging checklist.
+
+## Run
+
+`go run ./cmd/api` needs `DATABASE_URL`, `KAFKA_BROKERS` and `OFFER_AVAILABILITY_CONSUMER_GROUP`; optional
+`PRICING_CURRENCY` (default `BRL`), `POLICY_INTERVAL`, `OUTBOX_RELAY_INTERVAL`, `HTTP_ADDR`. Contracts:
+`apis/openapi.yaml`, `apis/asyncapi.yaml`. Assumptions: `docs/adr/0002-pricing-assumptions.md`.
