@@ -27,5 +27,8 @@ unleash:
     # differs. See HARNESS.md's mutation-testing section for the
     # tagless-switch-under-reports pitfall before assuming a low number
     # means missing tests.
-    efficacy: "0"
-    mutant-coverage: "0"
+    # Measured 2026-10-25 per package: itemprice 95.35, quote 87.36, schedule 95.24,
+    # shared 100.00, tax 92.98 (mutator coverage 100 everywhere). One threshold
+    # serves every package, so it sits just below the lowest (quote).
+    efficacy: "85"
+    mutant-coverage: "95"

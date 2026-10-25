@@ -1,0 +1,715 @@
+asyncapi: 3.0.0
+info:
+  title: pricing Domain Events
+  version: 1.0.0
+  contact:
+    name: pricing maintainers
+    url: https://github.com/IQVO/pricing
+    email: pricing@iqvo.example.com
+  license:
+    name: UNLICENSED
+  tags:
+    - name: pricing
+      description: The pricing bounded context (retail network, storefront tier).
+    - name: itemprice
+      description: Events raised by the ItemPrice aggregate.
+    - name: deliverychargeschedule
+      description: Events raised by the DeliveryChargeSchedule aggregate.
+    - name: taxtable
+      description: Events raised by the TaxTable aggregate.
+    - name: pricequote
+      description: Events raised by the PriceQuote aggregate (analytics only).
+    - name: consumed
+      description: Events produced by offer-availability that this service consumes.
+  description: |-
+    Event catalog for the **pricing** bounded context of the storefront (Core subdomain): list prices and sale windows per catalogue item, the delivery charge per service tier, a synthetic tax table and the binding PriceQuote.
+
+    **Published.** Five integration events through a **transactional outbox** (the aggregate row and its already-encoded events are written in ONE database transaction; an always-on relay drains them to Kafka, at-least-once). `ItemPriceChanged`, `ItemPriceWithdrawn`, `DeliveryChargeScheduleChanged` and `TaxTableChanged` go to `retailnetwork.pricing.events`; `PriceQuoteIssued` is analytics only and goes to `retailnetwork.pricing.analytics`. `ItemPriceChanged` is raised whenever the effective price moves: a list-price change, a sale window starting or ending (clock-driven policy PublishEffectivePriceOnWindowBoundary) or a CancelSale of a live sale (CancelSale has no event of its own). There is no PriceQuoteExpired event: quote expiry is checkout-internal TTL state.
+
+    **Consumed.** `CatalogItemCreated` and `CatalogItemDiscontinued` from offer-availability feed the local CatalogItemView; a discontinued item also runs the WithdrawOnDiscontinue policy (its ACTIVE price is withdrawn and `ItemPriceWithdrawn` published). Only the fields the service relies on are listed; unknown fields are ignored. The consumer group name comes from the mandatory variable OFFER_AVAILABILITY_CONSUMER_GROUP.
+
+    **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json; charset=UTF-8`. `specversion`, `id`, `source` (`/retailnetwork/pricing`), `type`, `subject`, `time`, `datacontenttype` (`application/json`) and `dataschema` (`urn:retailnetwork:pricing:events:<EventName>:v1`) are all required. Kafka key = the subject. Type = `com.retailnetwork.storefront.pricing.<entity>.<EventName>`. A breaking payload change is a new `.v2` type. Dispatch on the full `type`, ignore unknown types, dedupe on `id`.
+
+    **Ordering.** Item events share the catalogItemId as key and carry a monotonically increasing `version`: a consumer applies a version only above the last one it applied. Schedule and tax-table events carry the published `version`.
+
+    **Conventions.** `data` is camelCase; amounts are integer minor units of the single configured `currency`; instants are RFC 3339 UTC; enums are UPPER_SNAKE; optional fields are omitted when absent (never null).
+servers:
+  production:
+    host: '{brokers}'
+    protocol: kafka
+    description: Retail-network Kafka broker (host supplied by the deployment environment via KAFKA_BROKERS).
+    variables:
+      brokers:
+        default: kafka.retail-network.internal:9092
+defaultContentType: application/cloudevents+json
+channels:
+  pricingEvents:
+    address: retailnetwork.pricing.events
+    title: pricing integration topic
+    description: This service's integration topic. Written by the outbox relay; key = subject. Every message carries the CloudEvents content-type header.
+    messages:
+      ItemPriceChanged:
+        $ref: '#/components/messages/ItemPriceChanged'
+      ItemPriceWithdrawn:
+        $ref: '#/components/messages/ItemPriceWithdrawn'
+      DeliveryChargeScheduleChanged:
+        $ref: '#/components/messages/DeliveryChargeScheduleChanged'
+      TaxTableChanged:
+        $ref: '#/components/messages/TaxTableChanged'
+  pricingAnalytics:
+    address: retailnetwork.pricing.analytics
+    title: pricing analytics topic
+    description: Analytics-only facts; no operational consumer depends on them. Key = the quoteId.
+    messages:
+      PriceQuoteIssued:
+        $ref: '#/components/messages/PriceQuoteIssued'
+  offerAvailabilityEvents:
+    address: retailnetwork.offer-availability.events
+    title: offer-availability integration topic (consumed)
+    description: Produced by offer-availability (Conformist); consumed by pricing with its own consumer group. Idempotent on the CloudEvents id (inbox), dispatch on the full type, tolerant decoding, dead-letter on poison messages.
+    messages:
+      CatalogItemCreated:
+        $ref: '#/components/messages/ConsumedCatalogItemCreated'
+      CatalogItemDiscontinued:
+        $ref: '#/components/messages/ConsumedCatalogItemDiscontinued'
+operations:
+  publishPricingEvents:
+    action: send
+    title: Publish pricing events
+    summary: Publish ItemPriceChanged, ItemPriceWithdrawn, DeliveryChargeScheduleChanged and TaxTableChanged through the transactional outbox.
+    description: The service sends the integration events of the ItemPrice, DeliveryChargeSchedule and TaxTable aggregates to `retailnetwork.pricing.events`. Consumers route on the full `type`.
+    tags:
+      - name: pricing
+    channel:
+      $ref: '#/channels/pricingEvents'
+    messages:
+      - $ref: '#/channels/pricingEvents/messages/ItemPriceChanged'
+      - $ref: '#/channels/pricingEvents/messages/ItemPriceWithdrawn'
+      - $ref: '#/channels/pricingEvents/messages/DeliveryChargeScheduleChanged'
+      - $ref: '#/channels/pricingEvents/messages/TaxTableChanged'
+  publishPricingAnalytics:
+    action: send
+    title: Publish pricing analytics
+    summary: Publish PriceQuoteIssued to the analytics topic.
+    description: The service sends PriceQuoteIssued to `retailnetwork.pricing.analytics` through the same outbox.
+    tags:
+      - name: pricequote
+    channel:
+      $ref: '#/channels/pricingAnalytics'
+    messages:
+      - $ref: '#/channels/pricingAnalytics/messages/PriceQuoteIssued'
+  receiveOfferAvailabilityEvents:
+    action: receive
+    title: Receive offer-availability events
+    summary: Consume CatalogItemCreated and CatalogItemDiscontinued from offer-availability.
+    description: pricing consumes CatalogItemCreated and CatalogItemDiscontinued from `retailnetwork.offer-availability.events`. They feed CatalogItemView; CatalogItemDiscontinued also withdraws the item's price (WithdrawOnDiscontinue).
+    tags:
+      - name: consumed
+    channel:
+      $ref: '#/channels/offerAvailabilityEvents'
+    messages:
+      - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemCreated'
+      - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemDiscontinued'
+components:
+  messages:
+    ItemPriceChanged:
+      name: ItemPriceChanged
+      title: ItemPriceChanged
+      summary: The effective price of an item changed.
+      description: '`type` = `com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged`. Raised on item creation and whenever the effective price moves: SetListPrice, a sale window starting or ending (PublishEffectivePriceOnWindowBoundary), ScheduleSale of an already open window and CancelSale of a live sale (CancelSale has no event of its own). Subject and key = the catalogItemId. `saleEndsAt` is present only while a sale is live.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: itemprice
+      payload:
+        $ref: '#/components/schemas/ItemPriceChangedEvent'
+      examples:
+      - name: itemPriceChanged
+        summary: The effective price of an item changed.
+        payload:
+          specversion: '1.0'
+          id: 7a2c9e41-5f0b-4c3d-9e6a-1b8d4f0c2a55
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged
+          subject: cat-100234
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:ItemPriceChanged:v1
+          time: '2026-10-24T09:00:00.123456Z'
+          data:
+            catalogItemId: cat-100234
+            currency: BRL
+            listPriceMinor: 12990
+            effectivePriceMinor: 9990
+            saleEndsAt: '2026-10-31T23:59:59Z'
+            version: 7
+    ItemPriceWithdrawn:
+      name: ItemPriceWithdrawn
+      title: ItemPriceWithdrawn
+      summary: An item's price was withdrawn.
+      description: '`type` = `com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn`. Raised by WithdrawPrice (POST /item-prices/{catalogItemId}:withdraw) and by the WithdrawOnDiscontinue policy. A withdrawn item is no longer purchasable. Subject and key = the catalogItemId.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: itemprice
+      payload:
+        $ref: '#/components/schemas/ItemPriceWithdrawnEvent'
+      examples:
+      - name: itemPriceWithdrawn
+        summary: An item's price was withdrawn.
+        payload:
+          specversion: '1.0'
+          id: 7a2c9e41-5f0b-4c3d-9e6a-1b8d4f0c2a55
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn
+          subject: cat-100234
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:ItemPriceWithdrawn:v1
+          time: '2026-10-24T09:00:00.123456Z'
+          data:
+            catalogItemId: cat-100234
+            version: 8
+    DeliveryChargeScheduleChanged:
+      name: DeliveryChargeScheduleChanged
+      title: DeliveryChargeScheduleChanged
+      summary: A new delivery charge schedule became CURRENT.
+      description: '`type` = `com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged`. Raised by PublishChargeSchedule; the previous schedule is SUPERSEDED in the same transaction. Subject and key = the scheduleId.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: deliverychargeschedule
+      payload:
+        $ref: '#/components/schemas/DeliveryChargeScheduleChangedEvent'
+      examples:
+      - name: deliveryChargeScheduleChanged
+        summary: A new delivery charge schedule became CURRENT.
+        payload:
+          specversion: '1.0'
+          id: 7a2c9e41-5f0b-4c3d-9e6a-1b8d4f0c2a55
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged
+          subject: sched-1
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:DeliveryChargeScheduleChanged:v1
+          time: '2026-10-24T09:00:00.123456Z'
+          data:
+            scheduleId: sched-1
+            version: 3
+            tiers:
+            - tier: SAME_DAY
+              chargeMinor: 2490
+            - tier: NEXT_DAY
+              chargeMinor: 1490
+              freeOverMinor: 20000
+            - tier: TWO_DAY
+              chargeMinor: 990
+            - tier: STANDARD
+              chargeMinor: 0
+              freeOverMinor: 9900
+    TaxTableChanged:
+      name: TaxTableChanged
+      title: TaxTableChanged
+      summary: A new tax table became CURRENT.
+      description: '`type` = `com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged`. Raised by PublishTaxTable; the previous table is SUPERSEDED in the same transaction. Subject and key = the taxTableId.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: taxtable
+      payload:
+        $ref: '#/components/schemas/TaxTableChangedEvent'
+      examples:
+      - name: taxTableChanged
+        summary: A new tax table became CURRENT.
+        payload:
+          specversion: '1.0'
+          id: 7a2c9e41-5f0b-4c3d-9e6a-1b8d4f0c2a55
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged
+          subject: tax-1
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:TaxTableChanged:v1
+          time: '2026-10-24T09:00:00.123456Z'
+          data:
+            taxTableId: tax-1
+            version: 2
+            bands:
+            - postalPrefixFrom: '010'
+              postalPrefixTo: 099
+              rateBasisPoints: 1800
+            - postalPrefixFrom: '100'
+              postalPrefixTo: '199'
+              rateBasisPoints: 0
+    PriceQuoteIssued:
+      name: PriceQuoteIssued
+      title: PriceQuoteIssued
+      summary: A binding price quote was issued (analytics).
+      description: '`type` = `com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued`. Raised by IssuePriceQuote and published to retailnetwork.pricing.analytics only. Subject and key = the quoteId. There is no PriceQuoteExpired event.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: pricequote
+      payload:
+        $ref: '#/components/schemas/PriceQuoteIssuedEvent'
+      examples:
+      - name: priceQuoteIssued
+        summary: A binding price quote was issued (analytics).
+        payload:
+          specversion: '1.0'
+          id: 7a2c9e41-5f0b-4c3d-9e6a-1b8d4f0c2a55
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued
+          subject: q-1
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:PriceQuoteIssued:v1
+          time: '2026-10-24T09:00:00.123456Z'
+          data:
+            quoteId: q-1
+            cartId: cart-9
+            currency: BRL
+            totalMinor: 24570
+            expiresAt: '2026-10-24T09:15:00.123456Z'
+    ConsumedCatalogItemCreated:
+      name: CatalogItemCreated
+      title: CatalogItemCreated (consumed)
+      summary: CatalogItemCreated from offer-availability.
+      description: '`type` = `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated` produced by offer-availability on `retailnetwork.offer-availability.events`. Projected into CatalogItemView (ACTIVE) so a price can be created for the item. Only `catalogItemId` is used. Dispatch on the full type; unknown fields are ignored.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/CatalogItemCreatedEvent'
+      examples:
+      - name: catalogItemCreated
+        summary: CatalogItemCreated.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3a52-5f0e-4a61-9a37-2b9d4e1f6a10
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+          subject: cat-100234
+          time: '2026-10-22T08:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemCreated:v1
+          data:
+            catalogItemId: cat-100234
+    ConsumedCatalogItemDiscontinued:
+      name: CatalogItemDiscontinued
+      title: CatalogItemDiscontinued (consumed)
+      summary: CatalogItemDiscontinued from offer-availability.
+      description: '`type` = `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued` produced by offer-availability on `retailnetwork.offer-availability.events`. Marks the item DISCONTINUED in CatalogItemView (terminal; a late CatalogItemCreated never revives it) and runs WithdrawOnDiscontinue. Dispatch on the full type; unknown fields are ignored.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/CatalogItemDiscontinuedEvent'
+      examples:
+      - name: catalogItemDiscontinued
+        summary: CatalogItemDiscontinued.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3a52-5f0e-4a61-9a37-2b9d4e1f6a10
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+          subject: cat-100234
+          time: '2026-10-22T08:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemDiscontinued:v1
+          data:
+            catalogItemId: cat-100234
+  schemas:
+    Instant:
+      type: string
+      format: date-time
+      description: RFC 3339 instant in UTC.
+    ItemPriceChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:ItemPriceChanged:v1
+        data:
+          $ref: '#/components/schemas/ItemPriceChangedData'
+    ItemPriceChangedData:
+      type: object
+      required:
+      - catalogItemId
+      - currency
+      - listPriceMinor
+      - effectivePriceMinor
+      - version
+      properties:
+        catalogItemId:
+          type: string
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        listPriceMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The list price.
+        effectivePriceMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The price a shopper pays now (the list price or the live sale price).
+        saleEndsAt:
+          $ref: '#/components/schemas/Instant'
+          description: End of the live sale window; omitted when the effective price is the list price.
+        version:
+          type: integer
+          minimum: 1
+          description: ItemPrice version; apply only above the last applied version.
+    ItemPriceWithdrawnEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:ItemPriceWithdrawn:v1
+        data:
+          $ref: '#/components/schemas/ItemPriceWithdrawnData'
+    ItemPriceWithdrawnData:
+      type: object
+      required:
+      - catalogItemId
+      - version
+      properties:
+        catalogItemId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    DeliveryChargeScheduleChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:DeliveryChargeScheduleChanged:v1
+        data:
+          $ref: '#/components/schemas/DeliveryChargeScheduleChangedData'
+    DeliveryChargeScheduleChangedData:
+      type: object
+      required:
+      - scheduleId
+      - version
+      - tiers
+      properties:
+        scheduleId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        tiers:
+          type: array
+          items:
+            type: object
+            required:
+            - tier
+            - chargeMinor
+            properties:
+              tier:
+                type: string
+                enum:
+                - SAME_DAY
+                - NEXT_DAY
+                - TWO_DAY
+                - STANDARD
+              chargeMinor:
+                type: integer
+                format: int64
+                minimum: 0
+                description: The delivery charge of the tier.
+              freeOverMinor:
+                type: integer
+                format: int64
+                minimum: 0
+                description: Order subtotal from which the tier is free; omitted when there is no threshold.
+    TaxTableChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:TaxTableChanged:v1
+        data:
+          $ref: '#/components/schemas/TaxTableChangedData'
+    TaxTableChangedData:
+      type: object
+      required:
+      - taxTableId
+      - version
+      - bands
+      properties:
+        taxTableId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        bands:
+          type: array
+          items:
+            type: object
+            required:
+            - postalPrefixFrom
+            - postalPrefixTo
+            - rateBasisPoints
+            properties:
+              postalPrefixFrom:
+                type: string
+              postalPrefixTo:
+                type: string
+              rateBasisPoints:
+                type: integer
+                minimum: 0
+                maximum: 10000
+    PriceQuoteIssuedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:PriceQuoteIssued:v1
+        data:
+          $ref: '#/components/schemas/PriceQuoteIssuedData'
+    PriceQuoteIssuedData:
+      type: object
+      required:
+      - quoteId
+      - cartId
+      - currency
+      - totalMinor
+      - expiresAt
+      properties:
+        quoteId:
+          type: string
+        cartId:
+          type: string
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        totalMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The binding total.
+        expiresAt:
+          $ref: '#/components/schemas/Instant'
+    CatalogItemCreatedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/offer-availability
+        type:
+          type: string
+          const: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:offer-availability:events:CatalogItemCreated:v1
+        data:
+          $ref: '#/components/schemas/CatalogItemRef'
+    CatalogItemDiscontinuedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/offer-availability
+        type:
+          type: string
+          const: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+        subject:
+          type: string
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:offer-availability:events:CatalogItemDiscontinued:v1
+        data:
+          $ref: '#/components/schemas/CatalogItemRef'
+    CatalogItemRef:
+      type: object
+      required:
+      - catalogItemId
+      properties:
+        catalogItemId:
+          type: string
+
