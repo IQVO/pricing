@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS outbox_events;
+DROP TABLE IF EXISTS idempotency_keys;
+DROP TABLE IF EXISTS processed_events;
+DROP TABLE IF EXISTS catalog_items;
+DROP TABLE IF EXISTS quote_groups;
+DROP TABLE IF EXISTS quote_lines;
+DROP TABLE IF EXISTS price_quotes;
+DROP TABLE IF EXISTS tax_bands;
+DROP TABLE IF EXISTS tax_tables;
+DROP TABLE IF EXISTS tier_charges;
+DROP TABLE IF EXISTS delivery_charge_schedules;
+DROP TABLE IF EXISTS sale_windows;
+DROP TABLE IF EXISTS item_prices;
