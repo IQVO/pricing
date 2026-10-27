@@ -1,0 +1,12 @@
+apiVersion: v2
+name: pricing
+description: Pricing - item prices, charge schedules, sales, tax tables and price quotes in one configured currency; consumes offer-availability events and publishes price events from the transactional outbox on retailnetwork.pricing.events
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/IQVO/pricing
+keywords:
+  - ddd
+  - hexagonal-architecture
+  - retail-network
+  - golang
