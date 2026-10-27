@@ -35,6 +35,9 @@ type Deps struct {
 	Currency string
 	// QuoteTTL is the policy QuoteTtl (default DefaultQuoteTTL).
 	QuoteTTL time.Duration
+	// Metrics records the business outcome of each IssuePriceQuote; nil records
+	// nothing, so unit tests need no wiring.
+	Metrics ports.QuoteMetrics
 	// Log receives the events a consumer skipped; nil discards them.
 	Log *slog.Logger
 }
@@ -60,6 +63,20 @@ func (d Deps) logger() *slog.Logger {
 	}
 	return slog.New(slog.DiscardHandler)
 }
+
+// metrics returns the configured QuoteMetrics or a no-op.
+func (d Deps) metrics() ports.QuoteMetrics {
+	if d.Metrics != nil {
+		return d.Metrics
+	}
+	return noMetrics{}
+}
+
+// noMetrics is the QuoteMetrics of a Deps without one.
+type noMetrics struct{}
+
+func (noMetrics) QuoteIssued(context.Context)           {}
+func (noMetrics) QuoteRejected(context.Context, string) {}
 
 func (d Deps) quoteTTL() time.Duration {
 	if d.QuoteTTL > 0 {

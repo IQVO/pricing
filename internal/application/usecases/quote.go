@@ -41,6 +41,12 @@ type IssuePriceQuoteInput struct {
 
 // Execute issues the quote and publishes PriceQuoteIssued (analytics).
 func (u IssuePriceQuote) Execute(ctx context.Context, in IssuePriceQuoteInput) (views.PriceQuote, error) {
+	v, err := u.issue(ctx, in)
+	u.recordOutcome(ctx, err)
+	return v, err
+}
+
+func (u IssuePriceQuote) issue(ctx context.Context, in IssuePriceQuoteInput) (views.PriceQuote, error) {
 	return transact(ctx, u.UoW, commandAttempts, func(ctx context.Context) (views.PriceQuote, error) {
 		now := u.now()
 		lines, err := u.priceLines(ctx, in.Lines, now)

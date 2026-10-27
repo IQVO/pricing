@@ -22,3 +22,11 @@ See `docs/adr/` for decisions and `docs/before-first-release.md` for the packagi
 `go run ./cmd/api` needs `DATABASE_URL`, `KAFKA_BROKERS` and `OFFER_AVAILABILITY_CONSUMER_GROUP`; optional
 `PRICING_CURRENCY` (default `BRL`), `POLICY_INTERVAL`, `OUTBOX_RELAY_INTERVAL`, `HTTP_ADDR`. Contracts:
 `apis/openapi.yaml`, `apis/asyncapi.yaml`. Assumptions: `docs/adr/0002-pricing-assumptions.md`.
+
+## Observability
+
+Logs, metrics and traces follow the fleet standard ([ADR 0005](docs/adr/0005-fleet-observability-standard.md)): JSON logs on stdout carry `trace_id`/`span_id`
+and a `request_id`; `cmd/api` exports OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT`;
+export never blocks, so no Collector costs telemetry, nothing else) with HTTP request duration, Go runtime metrics and the business counter
+`pricing.quotes.issued` (`outcome`, `reason`); the trace continues across Kafka in the `traceparent` header of each published event and is picked up by the
+consumer.

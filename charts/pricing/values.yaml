@@ -144,6 +144,19 @@ database:
 kafka:
   brokers: ""
 
+# Fleet observability standard (ADR 0005): the pod exports traces and metrics over
+# OTLP/gRPC to the Collector (Jaeger + Prometheus behind it). Export never blocks, so a
+# Collector that is down costs telemetry and nothing else; otel.enabled=false renders no
+# OTEL_* env. serviceName is OTEL_SERVICE_NAME. SERVICE_VERSION is the image tag
+# (appVersion when empty), ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "pricing"
+
+# ENVIRONMENT: deployment.environment.name on every span, metric and log line.
+environment: "production"
+
 # Extra env vars appended to the api container as a raw list. The chart refuses
 # any *_MODE variable (this service has no mode: Postgres and Kafka are the only
 # runtime), any variable the chart renders itself and any *_CONSUMER_GROUP (the
