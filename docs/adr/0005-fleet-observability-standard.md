@@ -80,10 +80,11 @@ item-price commands are low-volume back-office operations and are already visibl
 
 ### Deviations from the customer-ordering reference
 
-- No `cmd/mcp`, no Helm chart (ecommerce repos have none yet) and no `docs/runtime.md`
-  or `docs/adr/index.md`: those parts were skipped, not stubbed. When a chart is added it
-  must render `otel.*` values as `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`,
-  `SERVICE_VERSION` and `ENVIRONMENT`.
+- No `cmd/mcp` and no `docs/runtime.md` or `docs/adr/index.md`: those parts were skipped, not
+  stubbed. The Helm chart landed on `develop` while this was in review, so it renders the
+  `otel.*` values (`otel.enabled`, `otel.endpoint`, `otel.serviceName`, `environment`) as
+  `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION` and `ENVIRONMENT`;
+  `tests/render_test.sh` asserts them and `extraEnv` refuses all four.
 - Only one inbound consumer (offer-availability) exists; the consumer span helper
   (`internal/adapters/inbound/kafka/tracing.go`) sits in the shared run path, so any
   consumer added later is covered.

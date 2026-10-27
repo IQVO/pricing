@@ -89,6 +89,18 @@ spec:
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ .Values.config.shutdownDrainDelay | quote }}
             {{- end }}
+            # Fleet observability standard: SERVICE_VERSION is the image tag (appVersion when
+            # empty), ENVIRONMENT labels every span, metric and log line.
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            {{- end }}
             # DATABASE_URL always comes from a Secret.
             - name: DATABASE_URL
               valueFrom:
