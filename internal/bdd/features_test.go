@@ -61,7 +61,7 @@ func newWorld() *world {
 		GetTaxTable: usecases.GetCurrentTaxTable{Deps: d}, IssuePriceQuote: usecases.IssuePriceQuote{Deps: d},
 		GetPriceQuote: usecases.GetPriceQuote{Deps: d}, IdempotencyStore: s.Idempotency(), Clock: clock,
 	}
-	w.srv = httptest.NewServer(httpadapter.NewRouter(api))
+	w.srv = httptest.NewServer(httpadapter.NewRouter(api, nil, ""))
 	return w
 }
 
