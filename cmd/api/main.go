@@ -48,6 +48,7 @@ import (
 	outboundkafka "github.com/IQVO/pricing/internal/adapters/outbound/kafka"
 	outboxrelay "github.com/IQVO/pricing/internal/adapters/outbound/outbox"
 	"github.com/IQVO/pricing/internal/adapters/outbound/postgres"
+	"github.com/IQVO/pricing/internal/adapters/outbound/telemetry"
 	"github.com/IQVO/pricing/internal/application/usecases"
 	"github.com/IQVO/pricing/internal/bootretry"
 )
@@ -99,6 +100,13 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer closeAdapters()
+
+	// The business counter binds to the MeterProvider telemetry.Setup installed.
+	quoteMetrics, err := telemetry.NewQuoteMetrics()
+	if err != nil {
+		return err
+	}
+	ad.deps.Metrics = quoteMetrics
 
 	readiness := newReadiness(ad.pool.Ping, rt.brokers)
 	httpServer := &http.Server{

@@ -137,3 +137,17 @@ type IDGenerator interface {
 	// NewQuoteID mints a quoteId.
 	NewQuoteID() quote.ID
 }
+
+// QuoteMetrics records the business outcome of every IssuePriceQuote attempt
+// (Tier 2 of the fleet metrics convention). The use case calls it once per
+// attempt: QuoteIssued when a quote was stored, QuoteRejected otherwise, with
+// the problem slug that says why (the `type` suffix the REST adapter answers
+// with: "item-not-priced", "no-tax-table", ...). The implementation lives in
+// internal/adapters/outbound/telemetry; a nil Deps.Metrics records nothing.
+type QuoteMetrics interface {
+	// QuoteIssued counts a quote that was issued.
+	QuoteIssued(ctx context.Context)
+	// QuoteRejected counts a request that issued no quote; reason is a stable,
+	// low-cardinality slug.
+	QuoteRejected(ctx context.Context, reason string)
+}
