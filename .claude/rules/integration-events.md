@@ -73,7 +73,7 @@ event envelope" under `docs/adr/`.
 | `com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn` | `retailnetwork.pricing.events` | catalogItemId | `urn:retailnetwork:pricing:events:ItemPriceWithdrawn:v1` |
 | `com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged` | `retailnetwork.pricing.events` | scheduleId | `urn:retailnetwork:pricing:events:DeliveryChargeScheduleChanged:v1` |
 | `com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged` | `retailnetwork.pricing.events` | taxTableId | `urn:retailnetwork:pricing:events:TaxTableChanged:v1` |
-| `com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued` | `retailnetwork.pricing.analytics` | quoteId | `urn:retailnetwork:pricing:events:PriceQuoteIssued:v1` |
+| `com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued` | `retailnetwork.pricing.analytics` | quoteId | `urn:retailnetwork:pricing:analytics:PriceQuoteIssued:v1` |
 
 Catalogue and payloads: `docs/adr/0004-cloudevents-envelope-and-type-catalogue.md`
 and `apis/asyncapi.yaml`. Encoding lives in `internal/adapters/outbound/kafka`
