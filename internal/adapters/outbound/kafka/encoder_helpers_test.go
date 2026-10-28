@@ -95,7 +95,11 @@ func assertEnvelope(t *testing.T, msg outbox.Message, entity, name, subject, top
 	if msg.Subject != subject || string(msg.Key) != subject {
 		t.Fatalf("subject/key = %q %q", msg.Subject, msg.Key)
 	}
-	if msg.DataSchema != "urn:retailnetwork:pricing:events:"+name+":v1" {
+	stream := "events"
+	if topic == kafka.TopicAnalytics {
+		stream = "analytics"
+	}
+	if msg.DataSchema != "urn:retailnetwork:pricing:"+stream+":"+name+":v1" {
 		t.Fatalf("dataschema = %q", msg.DataSchema)
 	}
 	if len(msg.Headers) != 1 || msg.Headers[0].Key != "content-type" || msg.Headers[0].Value != cloudevents.MediaType {

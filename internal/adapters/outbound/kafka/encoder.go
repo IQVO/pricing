@@ -40,7 +40,7 @@ func (e *Encoder) Encode(events ...shared.Event) ([]outbox.Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		msg, err := buildMessage(ev, newID(), e.Prefix+topicFor(stream), data)
+		msg, err := buildMessage(ev, newID(), e.Prefix+topicFor(stream), stream, data)
 		if err != nil {
 			return nil, err
 		}
@@ -56,13 +56,14 @@ func topicFor(stream string) string {
 	return TopicEvents
 }
 
-// buildMessage wraps data in the CloudEvents envelope. The dataschema URN names
-// the `events` stream for every event, analytics-only ones included (the
-// model's domain-events page pins urn:retailnetwork:pricing:events:<Event>:v1).
-func buildMessage(ev shared.Event, id, topic string, data any) (outbox.Message, error) {
+// buildMessage wraps data in the CloudEvents envelope. The dataschema URN's
+// stream segment names the stream the event is published on (the fleet event
+// standard): `events` on the integration topic, `analytics` on the analytics
+// topic. The model's domain-events page pins urn:retailnetwork:pricing:<stream>:<Event>:v1.
+func buildMessage(ev shared.Event, id, topic, stream string, data any) (outbox.Message, error) {
 	value, err := cloudevents.New(cloudevents.Spec{
 		ID: id, Entity: ev.Entity(), EventName: ev.EventName(), Subject: ev.SubjectID(), Time: ev.OccurredAt(),
-		Stream: cloudevents.StreamEvents, Version: schemaVersion, Data: data,
+		Stream: stream, Version: schemaVersion, Data: data,
 	})
 	if err != nil {
 		return outbox.Message{}, fmt.Errorf("encode %s: %w", ev.EventName(), err)
@@ -70,7 +71,7 @@ func buildMessage(ev shared.Event, id, topic string, data any) (outbox.Message, 
 	ct := cloudevents.ContentTypeHeader()
 	return outbox.Message{
 		EventID: id, Topic: topic, EventType: cloudevents.Type(ev.Entity(), ev.EventName()), Subject: ev.SubjectID(),
-		Key: []byte(ev.SubjectID()), DataSchema: cloudevents.DataSchema(cloudevents.StreamEvents, ev.EventName(), schemaVersion),
+		Key: []byte(ev.SubjectID()), DataSchema: cloudevents.DataSchema(stream, ev.EventName(), schemaVersion),
 		Value: value, Headers: []outbox.Header{{Key: ct.Key, Value: string(ct.Value)}},
 	}, nil
 }
