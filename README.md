@@ -1,5 +1,7 @@
 # pricing
 
+[![CI](https://github.com/IQVO/pricing/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/IQVO/pricing/actions/workflows/ci.yml?query=branch%3Adevelop) [![coverage gate](https://img.shields.io/badge/coverage%20gate-90%25-brightgreen)](https://github.com/IQVO/pricing/blob/develop/Makefile) [![Go](https://img.shields.io/badge/go-1.27.3-00ADD8?logo=go&logoColor=white)](https://github.com/IQVO/pricing/blob/develop/go.mod) [![release](https://img.shields.io/github/v/release/IQVO/pricing?sort=semver)](https://github.com/IQVO/pricing/releases) [![docs](https://img.shields.io/badge/docs-iqvo.github.io-blue)](https://iqvo.github.io/pricing/) [![license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/IQVO/pricing/blob/develop/LICENSE)
+
 Storefront (e-commerce) domain of the retail-network organisation, bounded context **Pricing** (Core, storefront tier).
 
 Owns what a shopper pays: the list price and sale windows per catalogue item, the delivery charge per service tier, a synthetic tax table, and the binding, immutable, expiring PriceQuote a checkout session is confirmed against. One configured currency, integer minor units; promotions are a later phase (D10).
