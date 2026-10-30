@@ -1,6 +1,7 @@
-# Default values for pricing. One component: the api Deployment (cmd/api:
-# REST, the outbox relay, the offer-availability consumer and the clock-driven
-# policy loop in one process). The chart refuses to render without the
+# Default values for pricing. One component by default: the api Deployment
+# (cmd/api: REST, the outbox relay, the offer-availability consumer and the
+# clock-driven policy loop in one process); the read-only A2A agent
+# (cmd/a2a) is a second, optional one (a2a.enabled, default false). The chart refuses to render without the
 # mandatory values below (named in the failure): database.*, kafka.brokers and
 # config.offerAvailabilityConsumerGroup.
 
@@ -197,3 +198,44 @@ terminationGracePeriodSeconds: 50
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# A2A (Agent2Agent) agent (cmd/a2a, ADR 0007): a READ-ONLY inbound adapter over
+# the same query use cases as the REST GET routes. Skills: item_price and
+# quote_status. Off by default; warehouse-infra turns it on. A separate
+# Deployment + Service (<release>-a2a) in the same image (command /app/a2a). It
+# needs Postgres only: it renders no Kafka, outbox or consumer variable, and
+# only the api Deployment runs the outbox relay. A2A carries delegation only;
+# facts between contexts still travel as CloudEvents on Kafka.
+a2a:
+  enabled: false
+  replicaCount: 1
+  # A2A_ADDR the binary listens on; keep in sync with service.targetPort.
+  # (8080 is the api.)
+  httpAddr: ":8093"
+  # Absolute URL advertised on the Agent Card. Empty defaults to this
+  # release's in-cluster Service DNS (http://<release>-a2a.<ns>.svc.cluster.local:8093/);
+  # warehouse-infra can override it with the gateway path when the agent must
+  # be reachable off-cluster.
+  agentUrl: ""
+  service:
+    type: ClusterIP
+    port: 8093
+    targetPort: 8093
+  # Gateway exposure of the A2A agent (a2a-route.yaml): host path
+  # /api/a2a/<context> rewritten to / (JSON-RPC root; the well-known agent
+  # card stays reachable under the same prefix). Off by default;
+  # warehouse-infra turns it on with the real parentRefs and path.
+  route:
+    enabled: false
+    path: "/api/a2a/pricing"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
