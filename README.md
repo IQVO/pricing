@@ -23,6 +23,26 @@ See `docs/adr/` for decisions and `docs/before-first-release.md` for the packagi
 `PRICING_CURRENCY` (default `BRL`), `POLICY_INTERVAL`, `OUTBOX_RELAY_INTERVAL`, `HTTP_ADDR`. Contracts:
 `apis/openapi.yaml`, `apis/asyncapi.yaml`. Assumptions: `docs/adr/0002-pricing-assumptions.md`.
 
+## A2A agent (read-only)
+
+`cmd/a2a` ([ADR 0007](docs/adr/0007-a2a-inbound-adapter.md)) is a second binary in the same image (`/app/a2a`) that
+serves an Agent2Agent agent over JSON-RPC: the Agent Card is at `/.well-known/agent-card.json`, the endpoint is
+mounted at `/` and `/a2a`, `GET /healthz` serves the probes. It is **read-only** and needs only `DATABASE_URL` and
+the mandatory `A2A_AGENT_URL` (the absolute http(s) URL advertised on the card); optional `MIGRATIONS_DATABASE_URL`,
+`A2A_ADDR` (default `:8093`). It reads and writes no Kafka topic and runs no outbox relay. The Helm chart deploys it
+as `<release>-a2a` when `a2a.enabled=true` (default `false`), routed at `/api/a2a/pricing` when `a2a.route.enabled=true`.
+
+Two skills, called as a `SendMessage` data part `{"skill": "<id>", "arguments": {...}}`; each returns what the matching
+REST `GET` returns:
+
+- `item_price`: `{catalogItemId}` returns the state, list price, effective price now and sale windows
+  (`GET /item-prices/{catalogItemId}`).
+- `quote_status`: `{quoteId}` returns the quote, `ISSUED` or `EXPIRED` now, with its lines, delivery charges, tax and
+  total (`GET /price-quotes/{quoteId}`).
+
+Rejections come back as an in-band RFC 7807 `problem` with the REST status class (`404` unknown id, `400` malformed
+request). A2A carries delegation only; facts still leave as CloudEvents on Kafka.
+
 ## Observability
 
 Logs, metrics and traces follow the fleet standard ([ADR 0005](docs/adr/0005-fleet-observability-standard.md)): JSON logs on stdout carry `trace_id`/`span_id`
