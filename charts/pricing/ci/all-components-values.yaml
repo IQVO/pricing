@@ -20,6 +20,14 @@ autoscaling:
     enabled: true
 ingress:
   enabled: true
+a2a:
+  enabled: true
+  route:
+    enabled: true
+    parentRefs:
+      - name: warehouse-gateway
+        namespace: kong
+        sectionName: http
 gatewayApi:
   enabled: true
   parentRefs:

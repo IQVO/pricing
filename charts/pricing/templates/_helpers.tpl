@@ -51,6 +51,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 0007).
+*/}}
+{{- define "pricing.a2aFullname" -}}
+{{- include "pricing.fullname" . }}-a2a
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "pricing.serviceAccountName" -}}
@@ -121,7 +128,7 @@ service has no mode: Postgres and Kafka are the only runtime), no
 the chart renders itself (the same variable is never set twice).
 */}}
 {{- define "pricing.requireCleanExtraEnv" -}}
-{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "PRICING_CURRENCY" "POLICY_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "OFFER_AVAILABILITY_CONSUMER_GROUP" -}}
+{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "PRICING_CURRENCY" "POLICY_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "OFFER_AVAILABILITY_CONSUMER_GROUP" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
@@ -174,6 +181,17 @@ The port of HTTP_ADDR is the container port the probes and the Service target.
 {{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.config.httpAddr)) -}}
 {{- if ne $port (toString .Values.service.targetPort) -}}
 {{- fail (printf "config.httpAddr is %q but service.targetPort is %v: the container port, the probes and the Service must agree." .Values.config.httpAddr .Values.service.targetPort) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The port of a2a.httpAddr is the container port the probes and the A2A Service
+target (cmd/a2a listens on A2A_ADDR).
+*/}}
+{{- define "pricing.requireA2AHttpPort" -}}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.a2a.httpAddr)) -}}
+{{- if ne $port (toString .Values.a2a.service.targetPort) -}}
+{{- fail (printf "a2a.httpAddr is %q but a2a.service.targetPort is %v: the container port, the probes and the Service must agree." .Values.a2a.httpAddr .Values.a2a.service.targetPort) -}}
 {{- end -}}
 {{- end -}}
 

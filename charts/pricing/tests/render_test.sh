@@ -140,8 +140,9 @@ if grep -qiE 'in-memory|silently runs|permissive' <<<"$render_all"$'\n'"$(cat "$
   fail "the render or NOTES.txt mentions an in-memory / permissive mode"
 fi
 
-# Only the api component exists: one Deployment, one Service, no MCP or frontend.
-for stray in mcp frontend projector reports analytics; do
+# By default only the api component exists: one Deployment, one Service, no MCP,
+# frontend or A2A (a2a.enabled is off until warehouse-infra turns it on).
+for stray in mcp frontend projector reports analytics a2a; do
   if grep -qE "app.kubernetes.io/component: .*$stray" <<<"$render_all"; then fail "the chart must not render a $stray component"; fi
 done
 [[ "$(grep -c '^kind: Deployment' <<<"$render_all")" == 1 ]] || fail "exactly one Deployment (the api) must render"
@@ -149,6 +150,33 @@ done
 for off in HorizontalPodAutoscaler Ingress HTTPRoute; do
   if grep -q "^kind: $off" <<<"$(helm template "$release" "$chart_dir" "${base[@]}")"; then fail "$off must be off by default"; fi
   grep -q "^kind: $off" <<<"$render_all" || fail "$off must render when enabled"
+done
+
+# --- observability (ADR 0005, fleet standard item 7) ---------------------------------
+# The api renders the fleet pipeline's env: the Collector endpoint, the service name,
+# the version (image tag, appVersion when empty) and the environment.
+otel_endpoint="otel-collector.observability.svc.cluster.local:4317"
+[[ "$(env_value "$api_deployment" OTEL_EXPORTER_OTLP_ENDPOINT)" == "$otel_endpoint" ]] \
+  || fail "the api Deployment does not render OTEL_EXPORTER_OTLP_ENDPOINT from otel.endpoint"
+[[ "$(env_value "$api_deployment" OTEL_SERVICE_NAME)" == "pricing" ]] \
+  || fail "the api Deployment does not render OTEL_SERVICE_NAME=pricing from otel.serviceName"
+[[ "$(env_value "$api_deployment" SERVICE_VERSION)" == "0.1.0" ]] || fail "SERVICE_VERSION must default to the chart appVersion"
+[[ "$(env_value "$api_deployment" ENVIRONMENT)" == "production" ]] || fail "ENVIRONMENT must come from environment"
+tagged="$(helm template "$release" "$chart_dir" "${base[@]}" --set image.tag=v9.9.9 --set otel.serviceName=prices \
+  --set otel.endpoint=http://collector:4317 --set environment=staging --show-only templates/deployment.yaml)"
+[[ "$(env_value "$tagged" SERVICE_VERSION)" == "v9.9.9" ]] || fail "SERVICE_VERSION must follow image.tag"
+[[ "$(env_value "$tagged" OTEL_SERVICE_NAME)" == "prices" ]] || fail "OTEL_SERVICE_NAME must follow otel.serviceName"
+[[ "$(env_value "$tagged" OTEL_EXPORTER_OTLP_ENDPOINT)" == "http://collector:4317" ]] || fail "OTEL_EXPORTER_OTLP_ENDPOINT must follow otel.endpoint"
+[[ "$(env_value "$tagged" ENVIRONMENT)" == "staging" ]] || fail "ENVIRONMENT must follow environment"
+# otel.enabled=false renders no OTEL_* env (SERVICE_VERSION stays: it also labels the logs' build).
+otel_off="$(helm template "$release" "$chart_dir" "${base[@]}" --set otel.enabled=false)"
+if grep -q 'name: OTEL_' <<<"$otel_off"; then fail "otel.enabled=false must render no OTEL_* env"; fi
+grep -q 'name: SERVICE_VERSION$' <<<"$otel_off" || fail "SERVICE_VERSION must still render with otel.enabled=false"
+# The values are chart-owned: extraEnv may not set them a second time.
+for owned in OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT SERVICE_VERSION ENVIRONMENT; do
+  err="$(helm template "$release" "$chart_dir" "${base[@]}" --set "extraEnv[0].name=$owned" --set 'extraEnv[0].value=x' 2>&1)" \
+    && fail "extraEnv must not be able to set $owned"
+  grep -qF "extraEnv sets $owned" <<<"$err" || fail "the refusal for extraEnv $owned does not name it: $err"
 done
 
 # --- refusals: the mandatory values name themselves ---------------------------------
@@ -194,11 +222,71 @@ helm template "$release" "$chart_dir" "${base[@]}" --set config.shutdownDrainDel
 expect_refusal "a drain delay the chart cannot size" "config.shutdownDrainDelay" "${base[@]}" --set config.shutdownDrainDelay=soon
 expect_refusal "an http address off the container port" "config.httpAddr" "${base[@]}" --set config.httpAddr=:9090
 
+# --- A2A agent (ADR 0007): a READ-ONLY second component, off by default ----------
+a2a_dep="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --show-only templates/a2a-deployment.yaml)"
+grep -A4 'name: DATABASE_URL$' <<<"$a2a_dep" | grep -q 'secretKeyRef:' || fail "the a2a DATABASE_URL must come from a Secret"
+grep -A6 'name: MIGRATIONS_DATABASE_URL$' <<<"$a2a_dep" | grep -q 'optional: true' || fail "the a2a MIGRATIONS_DATABASE_URL must be optional: true"
+[[ "$(env_value "$a2a_dep" A2A_ADDR)" == ":8093" ]] || fail "the a2a agent must listen on :8093 (8080 is the api)"
+grep -q 'command: \["/app/a2a"\]' <<<"$a2a_dep" || fail "the a2a Deployment must run /app/a2a"
+grep -q 'app.kubernetes.io/component: a2a$' <<<"$a2a_dep" || fail "the a2a Deployment must carry component=a2a"
+if grep -q 'configMapRef:' <<<"$a2a_dep"; then fail "the a2a Deployment must not mount the api ConfigMap"; fi
+[[ "$(env_value "$a2a_dep" OTEL_SERVICE_NAME)" == "pricing-a2a" ]] || fail "the a2a OTEL_SERVICE_NAME must be <otel.serviceName>-a2a, not the api's"
+# READ-ONLY: the agent neither produces nor consumes, so none of the api's Kafka,
+# outbox, consumer or policy variables may reach it (it must not even boot with them).
+for absent in KAFKA_BROKERS EVENT_PUBLISHER OUTBOX_RELAY_INTERVAL OUTBOX_MAX_ATTEMPTS OFFER_AVAILABILITY_CONSUMER_GROUP POLICY_INTERVAL PRICING_CURRENCY HTTP_ADDR SHUTDOWN_DRAIN_DELAY; do
+  if grep -q "name: $absent\$" <<<"$a2a_dep"; then fail "the read-only a2a Deployment renders $absent"; fi
+done
+if grep -qE 'name: [A-Z_]*(KAFKA|OUTBOX|CONSUMER_GROUP)' <<<"$a2a_dep"; then fail "the read-only a2a Deployment renders a Kafka/outbox/consumer variable"; fi
+# The Agent Card must advertise a dialable absolute URL: it defaults to the
+# release's in-cluster Service DNS (namespace-derived, so pattern-match) and
+# stays overridable.
+a2a_url="$(env_value "$a2a_dep" A2A_AGENT_URL || true)" # a missing var must reach the fail message below, not abort under set -e
+[[ "$a2a_url" =~ ^http://[a-z0-9.-]+-a2a\.[a-z0-9-]+\.svc\.cluster\.local:8093/$ ]] || fail "A2A_AGENT_URL default is not the in-cluster Service DNS: $a2a_url"
+a2a_override="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --set a2a.agentUrl=http://gw.example/api/a2a/pricing/ --show-only templates/a2a-deployment.yaml)"
+[[ "$(env_value "$a2a_override" A2A_AGENT_URL)" == "http://gw.example/api/a2a/pricing/" ]] || fail "a2a.agentUrl does not override A2A_AGENT_URL"
+# Chart vs binary: every variable cmd/a2a names as REQUIRED is rendered, derived
+# from the Go source so a new mandatory variable fails until the chart has it.
+a2a_required="$(grep -ho '[A-Z][A-Z0-9_]\{2,\} is required' "$repo_dir"/cmd/a2a/*.go --exclude='*_test.go' | sed -E 's/ is required//' | sort -u || true)"
+[[ -n "$a2a_required" ]] || fail "found no mandatory variables for cmd/a2a; the scan is looking in the wrong place"
+for var in $a2a_required; do
+  grep -q "name: $var\$" <<<"$a2a_dep" || fail "the a2a Deployment does not render $var, which cmd/a2a requires"
+done
+# ...and every variable cmd/a2a reads is rendered (ENVIRONMENT is read by the
+# telemetry package, not by cmd/a2a), and the Deployment renders nothing the
+# binary does not read (no dead keys).
+a2a_full="$(helm template "$release" "$chart_dir" "${base[@]}" "${everything[@]}" --set a2a.enabled=true --show-only templates/a2a-deployment.yaml)"
+a2a_read="$(grep -ohE '(Getenv|getenv|env)\("[A-Z][A-Z0-9_]*"' "$repo_dir"/cmd/a2a/*.go --exclude='*_test.go' | sed -E 's/.*\("//; s/"$//' | sort -u | tr '\n' ' ' || true)"
+(( $(wc -w <<<"$a2a_read") >= 6 )) || fail "found only $(wc -w <<<"$a2a_read") env names in cmd/a2a; the scan is looking in the wrong place"
+for var in $a2a_read; do
+  grep -q "name: $var\$" <<<"$a2a_full" || fail "the a2a Deployment does not render $var, which cmd/a2a reads"
+done
+while read -r var; do
+  [[ " $a2a_read ENVIRONMENT " == *" $var "* ]] || fail "the a2a Deployment renders $var, which cmd/a2a does not read"
+done < <(grep -E '^            - name: [A-Z]' <<<"$a2a_full" | sed -E 's/.*name: //' | sort -u)
+# The listen address and the Service target must agree.
+expect_refusal "an a2a address off the a2a container port" "a2a.httpAddr" "${base[@]}" --set a2a.enabled=true --set a2a.httpAddr=:9090
+# Service and route: a2a pods only, prefix rewritten to the JSON-RPC root.
+a2a_svc="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --show-only templates/a2a-service.yaml)"
+grep -q 'app.kubernetes.io/component: a2a$' <<<"$a2a_svc" || fail "the a2a Service must select component=a2a"
+grep -q 'port: 8093$' <<<"$a2a_svc" || fail "the a2a Service must expose 8093"
+a2a_route="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --set a2a.route.enabled=true --set a2a.route.parentRefs[0].name=warehouse-gateway --set a2a.route.parentRefs[0].namespace=kong --show-only templates/a2a-route.yaml)"
+grep -q 'value: /api/a2a/pricing$' <<<"$a2a_route" || fail "the a2a route path must default to /api/a2a/pricing"
+grep -q 'replacePrefixMatch: /$' <<<"$a2a_route" || fail "the a2a route must rewrite its prefix to /"
+grep -q 'name: pricing-a2a$' <<<"$a2a_route" || fail "the a2a route must target the a2a Service"
+if grep -qiE 'plugin|auth' <<<"$a2a_route"; then fail "the a2a route must carry no auth plugin: unauthenticated by fleet decision"; fi
+# Off by default: no a2a resource renders unless asked for, and the route needs both flags.
+default_render="$(helm template "$release" "$chart_dir" "${base[@]}")"
+if grep -q 'component: a2a' <<<"$default_render"; then fail "an a2a resource rendered with default values"; fi
+if grep -q 'component: a2a' <<<"$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.route.enabled=true)"; then fail "the a2a route rendered without a2a.enabled"; fi
+if grep -q 'kind: HTTPRoute' <<<"$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true)"; then fail "the a2a route must be off unless a2a.route.enabled"; fi
+
 # The full render (ct lint's all-components values file) carries every optional
-# template together, still exactly one Deployment and one Service.
+# template together: the api AND the a2a agent, one Deployment and one Service each.
 together="$(helm template "$release" "$chart_dir" -f "$chart_dir/ci/all-components-values.yaml")"
 grep -q 'app.kubernetes.io/component: api$' <<<"$together" || fail "the full render lacks the api component"
-[[ "$(grep -c '^kind: Deployment' <<<"$together")" == 1 ]] || fail "the full render must carry exactly the api Deployment"
-[[ "$(grep -c '^kind: Service$' <<<"$together")" == 1 ]] || fail "the full render must carry exactly the api Service"
+grep -q 'app.kubernetes.io/component: a2a$' <<<"$together" || fail "the full render lacks the a2a component"
+[[ "$(grep -c '^kind: Deployment' <<<"$together")" == 2 ]] || fail "the full render must carry exactly the api and a2a Deployments"
+[[ "$(grep -c '^kind: Service$' <<<"$together")" == 2 ]] || fail "the full render must carry exactly the api and a2a Services"
+[[ "$(grep -c '^kind: HTTPRoute' <<<"$together")" == 2 ]] || fail "the full render must carry exactly the api and a2a HTTPRoutes"
 
 echo "PASS: pricing chart render assertions"

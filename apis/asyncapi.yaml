@@ -254,7 +254,7 @@ components:
           type: com.retailnetwork.storefront.pricing.pricequote.PriceQuoteIssued
           subject: q-1
           datacontenttype: application/json
-          dataschema: urn:retailnetwork:pricing:events:PriceQuoteIssued:v1
+          dataschema: urn:retailnetwork:pricing:analytics:PriceQuoteIssued:v1
           time: '2026-10-24T09:00:00.123456Z'
           data:
             quoteId: q-1
@@ -605,7 +605,7 @@ components:
           const: application/json
         dataschema:
           type: string
-          const: urn:retailnetwork:pricing:events:PriceQuoteIssued:v1
+          const: urn:retailnetwork:pricing:analytics:PriceQuoteIssued:v1
         data:
           $ref: '#/components/schemas/PriceQuoteIssuedData'
     PriceQuoteIssuedData:
