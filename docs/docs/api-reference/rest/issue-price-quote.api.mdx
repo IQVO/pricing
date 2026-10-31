@@ -1,0 +1,70 @@
+---
+id: issue-price-quote
+title: "Issue a binding price quote for a checkout"
+description: "IssuePriceQuote. The quote is binding, immutable and expiring (policy QuoteTtl, default 15 minutes): lines with unit and line totals, groups with tier and delivery charge, tax, total, and the versions of price, schedule and tax table used. PriceQuoteIssued is published to the analytics topic. Called by checkout at session open."
+sidebar_label: "Issue a binding price quote for a checkout"
+hide_title: true
+hide_table_of_contents: true
+api: eJztWetvG7kR/1cGRD9Y6Oph1+klalHAjdXCuIvts3WPVnALanek5YVLbshZ24Kg/70Ycle7lmS7aXJfDs2HREsOyXn+5pG1ILn0YjwT106l+H1lCb24S4Qt0UlS1lxkYiyU9xW2FCIRGfrUqZIpxFhcPN0fwDRH+MQ/QXmYK5Mps0xAFUVFcq4RpMkAH0vllFnCUWm1SlcQzk5JJ5DhQlaa4PgNFMpUhL43Bq0MenhQlENlFIU7eA3IktQ+gaWzVVlTkEIXKDLU6h7dCtJcuiUmQPIxiUeSQEA5wj06r6zxYBdQshgJ+DTHrKpZJfkIkfHKYzaAVtQgecZSltVcK59jBmTDpdJIvSKVeiBbqnQA76XWmMGcecH0o60IJIFHz2+DLdEMRCJK6WSBhI7NshZGFsgazrAoLaFJV/1vcSUSoVjxOcoMnUiEw0+VcpiJMbkKd+1zBg5LlIQZfMQVOKTKGR+49GQdZuDQl9Z4ZA3w8kI5T5BKrZknVkYhxXgtaFUyO57YciIRhTLfoVlSLsbHiSjk4/br5O1mcxcZQ09/tdmKz+/ymVpDaIi3ZFlqlQanG/7ime/1/sN2/gum9ETgmUilo4sseiUpE664tp6kvna4UI8iEcF5RCKij7CHl459nBR6vr6+Yk/CzfOXHqKNz7Q70jm5imq6ICx80JKKv16TiaS2Sz4VRPtUSUOKVodY71Ie4mp7tt1UhnAZPKdQRhVVIcbHm81ms9XQ15AhXHVpRSLsYoEuyMGBWdvj0h4wRHPmFVbbKw8JHB454K1o+PRM3J59mPz7/OwfIhGXk5+n9c/pT1f1r9vp2eX52c05s0eKNF8y5Ts3LeevKOhpAB7359JjBqX1ihqk4Tirw6MGN5+rsmQ4MUC58hHROAB31f2c+TabluEdUL6JL4lI1MR7uPRkdMz/PGWZIVxFdAtIzmx8lWgNtwVf2MatJxmySlo5xxC3H7CJIPn4QRnLMgf0bj4a7GYtBXbP+MGQXNCf0b6HNe8fcpwXYCDy+IJTXdze/jA5F4mY/Hx9cTM5F3ebjkQHDpaSCB3r+l+zs/4/79Z/2PzuJRD5MtxIBGfN4A+1eqesxl8TT7pPvsK2LGxlqLHpVmt7zHXpDr2+sK6QFJf+eNplZ/Q/WaMTTx+swVVjn6i734xQnZUAFt8pg+LFbPCZCaCG/aYaex+KsS9A/18T4XeY/M0a+e+s7LjcYOvnM9bB4s8/vMXuAzrez0Z1ZR4L+f5ugd6PBfq2lA+VukiEzLKQcrlu69pjh1VWwzZ/HFDyVpBMEvZJFciu0qaZ//JIxwadfirm5NOTk/00fC+1ykKa7S+k0pglwKHXN5b6QSEZHE2cY7S+tBFrs14CWJS06scWjPcn/B0e6yVgbH9XiUxzaaPH39aLPbCOaVvlRqqpfJzyZ++FkqB0dq6x+P3rpcFTcW/+9h7enb75BuoLIEOSSvvBTtSFWxpdxuRcHagm42MvmKZyqu9wgRxc+33tdc0EHwevq2UCC+sAH2VRagR7j07LslRm2fdSY/9Bmcw+DERr5WcKieqVYu50NArdVPx68+5dgCXWxMErlfEkTfo5oj71xCCmqAvIAim33PaX1lPEl1yMxTC4W/QprrY8uvumS62c5m6UqBwPh9qmUufW0/jt6O1IcBfIbnDTdoKTqMBu49Uy/Gy/1ZLUFdJsr1hpSdoaZcQMNHls1skxo04T0R6MmaWbQLYV/2x0t7kL6l7EFNWJZB5knF1ftAUpV/2D0WBUx4hMQ4zU7XxZnyikMiSVYT0mHS368XC4VJRX80Fqi+HF9z9eDeszdUvajZnJ7RT4DSdTahqL5oW5rUyGWdjHx+12ppaKpI7t/8JZQzx1ceoeM1g4W3Q2hoXNUMe/BytZaDiqL/Oz+pW7gUNPvTgY4Vftg/HwkEsCCT63ZYkOSrnyPMXxFJHcB+TmuIEYNx6YrLZohQHnksjt0yFOoGP3UymGSU/Cz6wM5Ugqbac17YBnfwSVtPOnFohBtqOZZi6jPOtuoVyBGcil5FgbwJXBuLyseHzSpGc4uri9gtOT4296CdRxzSMs68LMyg9g4px1HqRDeA7r4Og5JO3BQ249RjxSHppNP/wzo9Nf4uDN55J5KjvgFR/knLFgf4Cj09Epc6g1LqXuk5MmNqa8866XsGxRJupXJeevuBEUupeS4Oj05KT3J0CZ5ixg42TBZUBmmQdrED7iXM77qfQRSwcwCTZ9cIoQSH4MHgE7ky6II64BXFqQFeVoqNZMYNIrz+mnHvqFhtpvnRxDzxbgmKGskKYTgqE9Btm4RvTJemjJIN+6wm5aWLdJ7/+Tz684+awzFyPLsNRSGTZcwMR1nYNm4kkOuksEpxleX695wPKD05sNL3+q0K3EeHaXiHvpFAvAX5ukmZhyIsiU541MjBdS+92hadfKRzd16dGDLx2lHhTyI64Oznjvpa6YWmySdU30PjLVn8YCqKHYG8e0J87SFEt6kfauk/Svr26nIhHzemDLMSzGwskHrsDkA3PD/z1ATd0e1tZCS7OsJLdLIt7Jf/4DpHFusw==
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/pricing-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Issue a binding price quote for a checkout"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/price-quotes"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+IssuePriceQuote. The quote is binding, immutable and expiring (policy QuoteTtl, default 15 minutes): lines with unit and line totals, groups with tier and delivery charge, tax, total, and the versions of price, schedule and tax table used. PriceQuoteIssued is published to the analytics topic. Called by checkout at session open.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./issue-price-quote.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./issue-price-quote.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./issue-price-quote.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,0 +1,70 @@
+---
+id: get-item-price
+title: "Get the price record of one catalogue item"
+description: "Returns the ItemPrice with its list price, sale windows and version."
+sidebar_label: "Get the price record of one catalogue item"
+hide_title: true
+hide_table_of_contents: true
+api: eJzdV21v20YM/ivEYR8STJbdzF0bbRgQdFlnDH3PWmCBB9ASLV0j3V3vKCeGof8+UJIdOU7SDdinfonjI498+PYcvVGMeVDJpZoxVW+9TimoeaSsI4+srZllKlE58U6sIpVRSL12IlaJek9cexOAC4KdFlxrLkBzgFIHBidnEQQsRWIyex0ATQYr8kFbE6tIOfRYEZMXNBtlsCKVqBQZS5uL3VmmIqXFo0MuVKQ8fam1p0wl7GuKVEgLqlAlG8VrJ5cDe21y1TRzUQ7OmkBB5CeTiXzsx3FREGimqgMrkFJrmAyLKjpX6rTNyPhzEP3NoT+7+Ewp7yG7PIhA8rFNJC2XlLJe0fZAEhRUpPq8yAkjk1TEeakJ6y6CfauHIW8vHkgiRaauBNjZi4vZx3MVqU+zi99/fX/26bWaN0N8XwkMK1sbfqWN9ZKr2nsy6foQ6lDv1qQ2TDnJzaX1FXJ39ONURarSRleCcdIM7N4TiUNm8lK7vy/PRn/NNz8036mmiRRrLkXzlTW0lmTcSfQ3FFnXMbcm0Htcy6AwVeFrgcrltild339LbysVKbaHwfa697Wa+9aS2qbhHgs73xkyjVhXJNps/63uwNcHLOlTy4Tt8Xbg74t4F+CToYFbQm4aOZ9OpoecZiyPlrY22SN05rxdlFR9/3Vau8P7v72A0+nTZ9AbgIwYdRniO4VvrWxxd7xUh8O6d84eyWPt9cjTkqS+h6/Q2x6EXIdQ1nkES+uBbrByJYFdkS/ROW3ykXTyqHuFYnWb0Qc4tA6PF2U6mUSqwpvu29PT00agSSbuNalNYDTpfwl1WPU+zLbmTaQq4sL2L3TX4YVK1FiGf9ROZRhv9p6KRipAfrV9ZmtfqkQVzC4Zj0ubYlnYwMnzyfOJkmdTm2XX3Tv/OtUmh7O3s8Ezlagn8SSe9D2Gadtj/Qvu+hsVasOojXiOBn5DMh7nmot6Eae2Gs/efXwz7u+o5qDnzj9cgPjwmDLYZbt0bD0spNEpa+V0sxNnOteMJQS2npbeGo4gI69XlIEM+kAwrmxGZfc3XmNVwlFvLFz2Xuaxp8DHMWwzYa9NgOsCGRBCYZ0jDw7XIRlsPt2ys7f9iFpfmbrbO6IOLZV6RX4NaYE+p1ZPCiY7FWvykbhZGy6IdQqMN8C4KClqPYiBhTaZNnkEuqrqXkY3TkuPtaDpXW2ZACEtKL2yNUOgIGUEHSR3S+0rygBzlF6N4Y2h7jivvWS3Z1g4mn14A9OTJ8+OI+jnAiqhbaiN5hDDuffWB0BP8BBXwNFDTHQM14UN1M2zDrAVhvHPMt2/xCD7WihQMLnB8HcOd8QHR9PJVBCWJeVYjtijCVrcieT0OJLYuph4VDsh607Q7adY6qwFN1qiLknMnZwc/wSEaSEBbpusbRnALAtgDcEVLXAxSjF0XBTDeVvTa6+ZgPGq7QiYZVQ5y5LN0R+0hoIwIx/DawtYc0GG+8y0IIMOQt/dZi0+pRG3/qld91o6czZwhWYwgi+Jd4Mi11LrM7koSPd78C6tbm4fjf9rz+9JT4Zq7ErURjC3dLDp+etSDfhLRSrZX3bnkRKOEr3NZoGB/vRl08jxl5r8WiWX80it0Gvp/ZbkMh3k/0wlSywDPRLj0fv+4TqGh6Bu9ywjW9YKy1q+qUhd0frg90ojC3VX1RZIp3OWpuR4cPvgx4Uw747aX55fqKb5B7KutjE=
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/pricing-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get the price record of one catalogue item"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/item-prices/{catalogItemId}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the ItemPrice with its list price, sale windows and version.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-item-price.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-item-price.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-item-price.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
