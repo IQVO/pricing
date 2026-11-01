@@ -11,8 +11,8 @@ Accepted (2026-11-01). Supersedes the idempotency, paging and route parts of
 The 2026-10-30 application portfolio assessment found three command-URL styles across the fleet, two spellings
 of the replay header, key reuse answered 422 in most services and 409 in one, writes without an idempotency
 key, and collections without paging. pricing had three `:custom-method` routes, a per-route `(route, key)`
-idempotency store that was written *after* the handler ran (outside the unit of work), the header spelled
-`Idempotent-Replayed`, reuse answered 422, and `GET /item-prices` paged with `after` and `next`.
+idempotency store that was written *after* the handler ran (outside the unit of work), a replay header with the
+retired `Idempotent-` prefix, reuse answered 422, and `GET /item-prices` paged with `after` and `next`.
 
 ## Decision
 
@@ -77,7 +77,7 @@ of `GET /item-prices`, checkout's `POST /price-quotes`) change in their own pull
 ## Consequences
 
 - Breaking for every REST client: new URLs, a `PUT`, the list envelope, `Idempotency-Key` required (and a 409
-  on reuse), `Idempotency-Replayed` instead of `Idempotent-Replayed`.
+  on reuse), `Idempotency-Replayed` instead of the retired `Idempotent-` spelling.
 - A retried request can no longer double-publish: the key row and the outbox rows are one transaction.
 - Tests: route tests with a real router, the Postgres repository contract (key store, nested unit of work,
   page walk) on testcontainers, and `cmd/api` integration tests that drive the shipped binary (fresh key,
