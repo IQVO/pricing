@@ -127,7 +127,7 @@ func TestMalformedBodies(t *testing.T) {
 func TestRejectNUL(t *testing.T) {
 	e := newEnv(t)
 	e.wantProblem(e.get("/item-prices/a%00b"), http.StatusNotFound, "resource-not-found")
-	e.wantProblem(e.get("/item-prices?after=a%00b"), http.StatusBadRequest, "malformed-request")
+	e.wantProblem(e.get("/item-prices?cursor=a%00b"), http.StatusBadRequest, "malformed-request")
 	e.wantProblem(e.post("/item-prices", `{"catalogItemId":"a\u0000b"}`), http.StatusBadRequest, "malformed-request")
 	e.wantProblem(e.post("/item-prices", "{\"catalogItemId\":\"a\x00b\"}"), http.StatusBadRequest, "malformed-request")
 	e.wantProblem(e.post("/item-prices", `{"catalogItemId":"a\\u0000b"}`), http.StatusUnprocessableEntity, "validation-failed")

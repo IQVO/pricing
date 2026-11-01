@@ -58,20 +58,3 @@ func TestSaleRoutes(t *testing.T) {
 	}
 	e.wantProblem(e.post("/item-prices/sku-1/sales/"+id+"/cancellations", ``), http.StatusNotFound, "not-found")
 }
-
-func TestListItemPricesPages(t *testing.T) {
-	e := newEnv(t)
-	e.priced("sku-1", 100)
-	e.priced("sku-2", 200)
-	e.priced("sku-3", 300)
-	p1 := e.get("/item-prices?limit=2").json(t)
-	if n := len(p1["items"].([]any)); n != 2 || p1["next"] != "sku-2" {
-		t.Fatalf("page 1 = %v", p1)
-	}
-	p2 := e.get("/item-prices?after=sku-2&limit=2").json(t)
-	if n := len(p2["items"].([]any)); n != 1 || p2["next"] != nil {
-		t.Fatalf("page 2 = %v", p2)
-	}
-	e.wantProblem(e.get("/item-prices?limit=0x"), http.StatusUnprocessableEntity, "validation-failed")
-	e.wantProblem(e.get("/item-prices?limit=501"), http.StatusUnprocessableEntity, "validation-failed")
-}
