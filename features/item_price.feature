@@ -31,7 +31,7 @@ Feature: Merchandising sets list prices and sale windows per catalogue item
 
   Scenario: Changing the list price publishes the new effective price
     Given the item "sku-1" is priced at 1000
-    When the API posts to "/item-prices/sku-1:set-list-price" the body:
+    When the API puts to "/item-prices/sku-1/list-price" the body:
       """
       {"listPrice":{"amountMinor":1200,"currency":"BRL"}}
       """
@@ -41,11 +41,11 @@ Feature: Merchandising sets list prices and sale windows per catalogue item
 
   Scenario: Withdrawing a price is final
     Given the item "sku-1" is priced at 1000
-    When the API posts to "/item-prices/sku-1:withdraw" with no body
+    When the API posts to "/item-prices/sku-1/withdrawals" with no body
     Then the API answers 200
     And the response field "state" is "WITHDRAWN"
     And 1 "ItemPriceWithdrawn" events were published
-    When the API posts to "/item-prices/sku-1:withdraw" with no body
+    When the API posts to "/item-prices/sku-1/withdrawals" with no body
     Then the API answers 409 with problem "illegal-transition"
 
   Scenario: Discontinuing the item withdraws its price

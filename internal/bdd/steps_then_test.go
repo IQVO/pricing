@@ -23,8 +23,8 @@ func registerThen(sc *godog.ScenarioContext, get func() *world) {
 	sc.Step(`^the response field "([^"]*)" is "([^"]*)"$`, func(path, want string) error { return get().wantField(path, want) })
 	sc.Step(`^the response field "([^"]*)" is (\d+)$`, func(path string, want int) error { return get().wantField(path, fmt.Sprint(want)) })
 	sc.Step(`^the response is marked replayed$`, func() error {
-		if v := get().header["Idempotent-Replayed"]; len(v) != 1 || v[0] != "true" {
-			return fmt.Errorf("Idempotent-Replayed = %v", v)
+		if v := get().header["Idempotency-Replayed"]; len(v) != 1 || v[0] != "true" {
+			return fmt.Errorf("Idempotency-Replayed = %v", v)
 		}
 		return nil
 	})
