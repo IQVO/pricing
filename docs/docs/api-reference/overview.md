@@ -29,12 +29,12 @@ See the [Quickstart](/docs/overview/quickstart) for example calls.
 | Tag | Endpoint | Operation id | Success |
 | --- | --- | --- | --- |
 | ItemPrices | `POST /item-prices` | `createItemPrice` | `201`, the item price at version 1 |
-| ItemPrices | `GET /item-prices` | `listItemPrices` | `200 {items, next}`, ordered by `catalogItemId`, `limit` 1 to 500 (default 100) |
+| ItemPrices | `GET /item-prices` | `listItemPrices` | `200 {items, nextCursor}`, keyset-paged, ordered by `catalogItemId`, `limit` 1 to 500 (default 100) and `cursor` |
 | ItemPrices | `GET /item-prices/{catalogItemId}` | `getItemPrice` | `200`, state, list price, effective price now, sales, version |
-| ItemPrices | `POST /item-prices/{catalogItemId}:set-list-price` | `setListPrice` | `200`, body `listPrice` and optional `version` guard |
-| ItemPrices | `POST /item-prices/{catalogItemId}:withdraw` | `withdrawPrice` | `200`, state `WITHDRAWN` |
+| ItemPrices | `PUT /item-prices/{catalogItemId}/list-price` | `setListPrice` | `200`, body `listPrice` and optional `version` guard; idempotent by method, no `Idempotency-Key` |
+| ItemPrices | `POST /item-prices/{catalogItemId}/withdrawals` | `withdrawPrice` | `200`, state `WITHDRAWN` |
 | ItemPrices | `POST /item-prices/{catalogItemId}/sales` | `scheduleSale` | `201`, the sale window with its `saleId` |
-| ItemPrices | `POST /item-prices/{catalogItemId}/sales/{saleId}:cancel` | `cancelSale` | `200`, the item price |
+| ItemPrices | `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | `cancelSale` | `200`, the item price |
 | DeliveryCharges | `POST /delivery-charge-schedules` | `publishChargeSchedule` | `201`, the schedule `CURRENT` |
 | DeliveryCharges | `GET /delivery-charge-schedules/current` | `getCurrentChargeSchedule` | `200`, or `404 not-found` before the first publish |
 | TaxTables | `POST /tax-tables` | `publishTaxTable` | `201`, the table `CURRENT` |
@@ -48,21 +48,27 @@ See the [Quickstart](/docs/overview/quickstart) for example calls.
 
 - **Money** is `{amountMinor, currency}` with integer minor units; the currency is
   always `PRICING_CURRENCY`. Instants are RFC 3339 UTC.
-- **`Idempotency-Key`.** Required on all eight `POST` routes (`400
-  idempotency-key-required` when absent or longer than 128 characters). The first
-  response below 500 for a route and key is stored for 24 hours; the same key with
-  the same method, path, query and body replays it with `Idempotent-Replayed:
-  true`; the same key with a different request is `422 idempotency-key-reused`.
-  A 5xx is never stored.
+- **`Idempotency-Key`.** Required on all seven `POST` routes (`400
+  idempotency-key-required` when absent, `400 idempotency-key-invalid` when not 1
+  to 128 printable ASCII characters); `PUT` is idempotent by method and takes none.
+  The key is global, not per route. The first response below 500 for a key is
+  stored for 24 hours; the same key with the same method, path and body replays
+  it with `Idempotency-Replayed: true`; the same key with a different request is
+  `409 idempotency-key-reused`. A 5xx is never stored. The key row commits in the
+  same transaction as the aggregate change and the outbox rows
+  ([ADR 0008](/docs/adr/0008-adopt-the-fleet-rest-api-guideline)).
 - **Optimistic concurrency.** Aggregates carry a `version` that grows with every
-  change. `set-list-price` takes an optional `version` that must equal the stored
+  change. `PUT .../list-price` takes an optional `version` that must equal the stored
   one when above zero; a lost race is `409 concurrent-update` and is safe to retry.
 - **Versioned publications.** A delivery charge schedule or tax table is published
   with a `version` that must exceed the current one (`409 non-increasing-version`);
   the previous one is superseded, never edited.
-- **Paging.** `GET /item-prices` takes `limit` and `after` (the `next` value of the
-  previous page, the last id of that page); no `next` (`null`) marks the last page.
-  It exists for projection bootstrap and rebuild, not for shopper requests.
+- **Paging.** `GET /item-prices` takes `limit` and the opaque `cursor` (the
+  `nextCursor` of the previous page) and answers `{items, nextCursor}`; no
+  `nextCursor` marks the last page. A bad `limit` is `400 invalid-limit`, a bad
+  cursor `400 invalid-cursor`, any other query parameter `400
+  unknown-query-parameter`. It exists for projection bootstrap and rebuild, not for
+  shopper requests.
 - **Errors** are RFC 9457 `application/problem+json` with `type`
   `/problems/<slug>`, `title`, `status`, `detail`, `instance`. The slugs, their
   causes and fixes are on

@@ -143,5 +143,5 @@ Source: `internal/adapters/outbound/postgres/migrations/0001_pricing_schema.up.s
 | `quote_groups` | 4 | `quote_id, group_no` | aggregate or read-model state; FK to `price_quotes` |
 | `catalog_items` | 3 | `catalog_item_id` | aggregate or read-model state |
 | `processed_events` | 3 | `event_id` | inbox: one row per consumed CloudEvents id (dedupe) |
-| `idempotency_keys` | 7 | `route, key` | stored REST answers per `Idempotency-Key` and route |
+| `idempotency_keys` | 7 | `route, key` | stored REST answers per `Idempotency-Key`; the key is global, so `route` is always the empty string (kept to avoid a migration) and the row commits with the change and its outbox rows |
 | `outbox_events` | 13 | `id` | transactional outbox the relay publishes to Kafka |
