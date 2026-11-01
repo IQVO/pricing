@@ -35,7 +35,13 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
-        <p className={styles.heroLead}>TODO-LEAD</p>
+        <p className={styles.heroLead}>
+          Pricing keeps the list price and sale windows of every catalogue item, the
+          delivery charge per service tier and a synthetic tax table, and issues the
+          binding, expiring price quote a checkout is confirmed against. It runs as a
+          REST API with a transactional outbox on Postgres and Kafka, plus a read-only
+          A2A agent.
+        </p>
         <div className={styles.buttons}>
           <Link className="button button--primary button--lg" to="/docs/overview/introduction">
             Read the docs

@@ -104,7 +104,7 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'link',
-          label: '0005 Adopt the fleet observability standard (logs, metrics, trace',
+          label: '0005 Adopt the fleet observability standard (logs, metrics, traces)',
           href: '/docs/adr/0005-fleet-observability-standard',
         },
         {

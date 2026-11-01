@@ -6,7 +6,7 @@ import type * as OpenApiPlugin from 'docusaurus-plugin-openapi-docs';
 const config: Config = {
   title: 'Pricing',
   tagline:
-    'Pricing: a Core bounded context of the storefront domain (warehouse-systems).',
+    'What a shopper pays: item prices, delivery charges, tax and binding price quotes. A Core bounded context of the storefront.',
   favicon: 'img/favicon.svg',
 
   future: {
