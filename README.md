@@ -174,19 +174,31 @@ telemetry, nothing else); the trace continues across Kafka in the
 ## API
 
 Contract: [`apis/openapi.yaml`](apis/openapi.yaml). No authentication. Errors
-are RFC 9457 problem details (`application/problem+json`). Every
-state-changing request takes an `Idempotency-Key` header; a retry with the
-same key replays the first response.
+are RFC 9457 problem details (`application/problem+json`). The API follows the
+fleet REST API guideline ([ADR 0008](docs/adr/0008-adopt-the-fleet-rest-api-guideline.md)):
+
+- Every `POST` takes an `Idempotency-Key` header (1-128 printable ASCII
+  characters, one fresh UUID per logical submit). A missing key is 400
+  `idempotency-key-required`, a malformed one 400 `idempotency-key-invalid`. A
+  retry with the same key, method, path and body replays the first answer byte
+  for byte with `Idempotency-Replayed: true`; the same key with another
+  request is 409 `idempotency-key-reused`. `PUT` is idempotent by method and
+  takes no key.
+- `GET /item-prices` is keyset-paged: `limit` (1..500, default 100) and the
+  opaque `cursor`, answering `{"items":[...],"nextCursor":"..."}`; follow
+  `nextCursor` until it is absent. Any other query parameter is 400
+  `unknown-query-parameter`; a bad `limit` is 400 `invalid-limit`, a bad
+  `cursor` 400 `invalid-cursor`.
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/item-prices` | Publish an item price |
-| `GET` | `/item-prices` | List item prices |
+| `GET` | `/item-prices` | List item prices (`limit`, `cursor`; `{items, nextCursor}`) |
 | `GET` | `/item-prices/{catalogItemId}` | Get one item price (state, list price, effective price, sale windows) |
-| `POST` | `/item-prices/{catalogItemId}:set-list-price` | Set the list price |
-| `POST` | `/item-prices/{catalogItemId}:withdraw` | Withdraw the price |
+| `PUT` | `/item-prices/{catalogItemId}/list-price` | Set the list price |
+| `POST` | `/item-prices/{catalogItemId}/withdrawals` | Withdraw the price |
 | `POST` | `/item-prices/{catalogItemId}/sales` | Schedule a sale window |
-| `POST` | `/item-prices/{catalogItemId}/sales/{saleId}:cancel` | Cancel a sale |
+| `POST` | `/item-prices/{catalogItemId}/sales/{saleId}/cancellations` | Cancel a sale |
 | `POST` | `/delivery-charge-schedules` | Publish a delivery charge schedule |
 | `GET` | `/delivery-charge-schedules/current` | Get the current schedule |
 | `POST` | `/tax-tables` | Publish a tax table |
@@ -285,10 +297,11 @@ publish) run only on pushes to `main`, after every other job is green.
 
 ## Architecture Decision Records
 
-[`docs/adr/`](docs/adr/) — 7 ADRs (0001 bounded context, 0002 assumptions,
+[`docs/adr/`](docs/adr/) — 8 ADRs (0001 bounded context, 0002 assumptions,
 0003 consumed contracts and local read model, 0004 CloudEvents envelope and
 type catalogue, 0005 fleet observability standard, 0006 dataschema stream
-segment names the actual stream, 0007 A2A inbound adapter).
+segment names the actual stream, 0007 A2A inbound adapter, 0008 adopt the fleet
+REST API guideline).
 
 ## License
 
