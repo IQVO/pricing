@@ -1,3 +1,10 @@
+---
+id: before-first-release
+title: Before the first release
+sidebar_label: Before the first release
+description: "Packaging checklist for Pricing's first merge to main: Dockerfile, Helm chart, chart tests, consumer groups and CI jobs."
+---
+
 # Before the first release: pricing
 
 The first merge to `main` runs `docker-publish` and `release`. Two services built from
