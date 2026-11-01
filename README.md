@@ -14,18 +14,23 @@ This project is a domain-driven design study. It is not associated with, endorse
 
 ## Documentation
 
-This repo has no docs site of its own. The context's design lives in
-[warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) — `storefront/model/model.yaml` there is the single source of truth.
-
-Page map:
+Published at **[https://iqvo.github.io/pricing/](https://iqvo.github.io/pricing/)**
+(Docusaurus, sources in [`docs/`](docs/); built by `.github/workflows/docs.yml`).
+The cross-context design lives in
+[warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/).
 
 | Area | Pages |
-|---|---|
-| Context pack | [Pricing context page](https://iqvo.github.io/warehouse-docs/storefront/contexts/pricing) and its 13-page ddd-crew pack (business context, ubiquitous language, core-domain chart, bounded-context canvas, context map, aggregate canvas, domain events, message flow, eventstorming, use cases, class/sequence/ER diagrams) |
-| Strategic design | [Storefront strategic design](https://iqvo.github.io/warehouse-docs/storefront/strategic-design/) — subdomain classification, context map, CloudEvents event standard, model gap register |
-| API reference | [REST reference generated from `apis/openapi.yaml`](https://iqvo.github.io/warehouse-docs/storefront/api-reference/rest/pricing/) |
-| Decisions | [Storefront ADR index](https://iqvo.github.io/warehouse-docs/storefront/adr/) |
-| In this repo | [`docs/adr/`](docs/adr/) (the repo's own ADRs), [`docs/operations/runbook.md`](docs/operations/runbook.md), [`docs/before-first-release.md`](docs/before-first-release.md) |
+| --- | --- |
+| Overview | [Introduction](https://iqvo.github.io/pricing/docs/overview/introduction), [Architecture](https://iqvo.github.io/pricing/docs/overview/architecture), [Quickstart](https://iqvo.github.io/pricing/docs/overview/quickstart) |
+| Operations | [Configuration](https://iqvo.github.io/pricing/docs/operations/configuration), [Runbook](https://iqvo.github.io/pricing/docs/operations/runbook), [Observability](https://iqvo.github.io/pricing/docs/operations/observability), [Troubleshooting](https://iqvo.github.io/pricing/docs/operations/troubleshooting), [Before the first release](https://iqvo.github.io/pricing/docs/operations/before-first-release) |
+| Development | [Testing](https://iqvo.github.io/pricing/docs/development/testing) |
+| Domain-driven design | [Ubiquitous language](https://iqvo.github.io/pricing/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/pricing/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/pricing/docs/ddd/subdomain-classification), [DDD artifacts](https://iqvo.github.io/pricing/docs/ddd/ddd-artifacts) |
+| ddd-crew artifacts | [Core domain chart](https://iqvo.github.io/pricing/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/pricing/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/pricing/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/pricing/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/pricing/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/pricing/docs/ddd/eventstorming), [Class diagram](https://iqvo.github.io/pricing/docs/ddd/class-diagram), [Entity relationship](https://iqvo.github.io/pricing/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/pricing/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/pricing/docs/ddd/domain-events) |
+| API reference | [API overview](https://iqvo.github.io/pricing/docs/api-reference) (REST, A2A), [REST reference generated from `apis/openapi.yaml`](https://iqvo.github.io/pricing/docs/api-reference/rest/pricing-api), [Event catalogue](https://iqvo.github.io/pricing/docs/api-reference/events) |
+| Ecosystem | [Integration](https://iqvo.github.io/pricing/docs/ecosystem/integration) |
+| Decisions | [ADR index](https://iqvo.github.io/pricing/docs/adr) and the sources in [`docs/adr/`](docs/adr/) |
+| In this repo | [`docs/docs/operations/runbook.md`](docs/docs/operations/runbook.md), [`docs/docs/operations/before-first-release.md`](docs/docs/operations/before-first-release.md) |
+| Aggregator | [Pricing in the storefront pack](https://iqvo.github.io/warehouse-docs/storefront/contexts/pricing) and the [Storefront strategic design](https://iqvo.github.io/warehouse-docs/storefront/strategic-design/) |
 
 ## Architecture
 
@@ -144,7 +149,7 @@ answers a metadata request; `/healthz` is liveness only. Assumptions:
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait after flipping `/readyz` before closing |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `OTEL_SERVICE_NAME` | `pricing` | `service.name` of spans and metrics |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | in-cluster Collector | OTLP/gRPC endpoint; export never blocks |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | OTLP/gRPC endpoint (the chart sets the in-cluster Collector); export never blocks |
 | `SERVICE_VERSION` | `dev` | `service.version` |
 | `ENVIRONMENT` | `local` | `deployment.environment.name` |
 

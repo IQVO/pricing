@@ -1,0 +1,70 @@
+---
+id: create-item-price
+title: "Create the price record of a catalogue item"
+description: "Creates the ItemPrice aggregate for a catalogue item that exists in the local CatalogItemView (fed by offer-availability events). The initial list price is set here; sale windows are scheduled separately."
+sidebar_label: "Create the price record of a catalogue item"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/pricing-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Create the price record of a catalogue item"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/item-prices"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Creates the ItemPrice aggregate for a catalogue item that exists in the local CatalogItemView (fed by offer-availability events). The initial list price is set here; sale windows are scheduled separately.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./create-item-price.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./create-item-price.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./create-item-price.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
