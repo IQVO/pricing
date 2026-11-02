@@ -862,7 +862,7 @@ components:
         versions:
           type: object
           description: >-
-            Versions used, keyed "chargeSchedule", "taxTable" and "price:<catalogItemId>" per line (see the key constants in views).
+            Versions used, keyed "chargeSchedule", "taxTable" and "price:<catalogItemId>" per line.
           additionalProperties:
             type: integer
             format: int64
