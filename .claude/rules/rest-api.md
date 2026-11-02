@@ -11,12 +11,12 @@ Routes of `apis/openapi.yaml`, served by `internal/adapters/inbound/http` (chi);
 POST requires `Idempotency-Key`.
 
 - `POST /item-prices` -> `CreateItemPrice`
-- `GET /item-prices` -> `ListItemPrices` (bootstrap/rebuild only; `after`, `limit` 1..500)
+- `GET /item-prices` -> `ListItemPrices` (bootstrap/rebuild only; keyset-paged `{items,nextCursor}`, `cursor`, `limit` 1..500)
 - `GET /item-prices/{catalogItemId}` -> `GetItemPrice`
-- `POST /item-prices/{catalogItemId}:set-list-price` -> `SetListPrice`
-- `POST /item-prices/{catalogItemId}:withdraw` -> `WithdrawPrice`
+- `PUT /item-prices/{catalogItemId}/list-price` -> `SetListPrice`
+- `POST /item-prices/{catalogItemId}/withdrawals` -> `WithdrawPrice`
 - `POST /item-prices/{catalogItemId}/sales` -> `ScheduleSale`
-- `POST /item-prices/{catalogItemId}/sales/{saleId}:cancel` -> `CancelSale`
+- `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` -> `CancelSale`
 - `POST /delivery-charge-schedules` -> `PublishChargeSchedule`
 - `GET /delivery-charge-schedules/current` -> `GetCurrentChargeSchedule`
 - `POST /tax-tables` -> `PublishTaxTable`
