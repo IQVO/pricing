@@ -23,7 +23,7 @@ const sidebar: SidebarsConfig = {
         {
           type: "doc",
           id: "api-reference/rest/list-item-prices",
-          label: "List item prices, paged (projection bootstrap)",
+          label: "List item prices, keyset-paged (projection bootstrap)",
           className: "api-method get",
         },
         {
@@ -36,7 +36,7 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "api-reference/rest/set-list-price",
           label: "Set the list price of a catalogue item",
-          className: "api-method post",
+          className: "api-method put",
         },
         {
           type: "doc",

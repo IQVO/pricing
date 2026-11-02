@@ -47,9 +47,11 @@ cite them as `ADR 0002 A<n>`.
   refused with 422 `no-charge-schedule` or `no-tax-table`.
 - **A12 Quote state on read.** A quote reads as EXPIRED once `expiresAt` has passed,
   whether or not the clock-driven policy stored it yet.
-- **A13 Idempotency.** Every POST requires `Idempotency-Key` (1-128 characters); the
-  first response below 500 is stored for 24 h per (route, key); the same key with
-  another request is 422 `idempotency-key-reused`.
+- **A13 Idempotency.** Every POST requires `Idempotency-Key` (1-128 printable ASCII
+  characters); the first response below 500 is stored for 24 h per key (the key is
+  global, not per route); the same key with another request is 409
+  `idempotency-key-reused`. Amended by [ADR 0008](0008-adopt-the-fleet-rest-api-guideline.md)
+  (was per (route, key) and 422).
 - **A14 IssuePriceQuote request.** `{cartId, lines[catalogItemId, quantity],
   groups[groupNo, offerId, tier, lineNos], destinationPostalPrefix}` (model-gap
   decision 5). The quote prices exactly what the checkout session froze; `offerId`
@@ -58,14 +60,17 @@ cite them as `ADR 0002 A<n>`.
   run in-process every `POLICY_INTERVAL` (default 5 s) in `cmd/api`; each pass is
   idempotent and bounded to a batch.
 - **A16 List paging.** `GET /item-prices` is bootstrap and rebuild only: ordered by
-  catalogItemId, `after` is the last id of the previous page, `limit` 1..500
-  (default 100), `next` is null on the last page.
+  catalogItemId, `cursor` is the opaque keyset after the last id of the previous
+  page, `limit` 1..500 (default 100), `nextCursor` is absent on the last page.
+  Amended by [ADR 0008](0008-adopt-the-fleet-rest-api-guideline.md) (was `after` and
+  `next`).
 - **A17 Clock.** The production clock returns UTC truncated to the microsecond (see A8).
 - **A18 Schedules and tables.** A published version must exceed the current one
   (`non-increasing-version`, 409); publishing supersedes the previous one in the same
   transaction (states CURRENT to SUPERSEDED, model-gap decision 4).
-- **A19 WithdrawPrice route.** `POST /item-prices/{catalogItemId}:withdraw`
-  (model-gap decision 1).
+- **A19 WithdrawPrice route.** `POST /item-prices/{catalogItemId}/withdrawals`
+  (model-gap decision 1; a transition resource since
+  [ADR 0008](0008-adopt-the-fleet-rest-api-guideline.md)).
 
 ## Consequences
 

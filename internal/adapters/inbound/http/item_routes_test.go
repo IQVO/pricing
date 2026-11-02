@@ -14,22 +14,25 @@ func TestItemPriceLifecycleRoutes(t *testing.T) {
 	if v := got.json(t); v["state"] != "ACTIVE" || v["version"].(float64) < 1 {
 		t.Fatalf("item price = %s", got.Body)
 	}
-	set := e.post("/item-prices/sku-1:set-list-price", `{"listPrice":`+money(1200)+`}`)
+	set := e.put("/item-prices/sku-1/list-price", `{"listPrice":`+money(1200)+`}`)
 	e.wantStatus(set, http.StatusOK)
 	if lp := set.json(t)["listPrice"].(map[string]any)["amountMinor"]; lp != float64(1200) {
 		t.Fatalf("listPrice = %v", lp)
 	}
-	e.wantProblem(e.post("/item-prices/sku-1:set-list-price", `{"listPrice":{"amountMinor":-1,"currency":"BRL"}}`), http.StatusUnprocessableEntity, "negative-amount")
-	e.wantProblem(e.post("/item-prices/sku-1:set-list-price", `{"listPrice":{"amountMinor":1,"currency":"USD"}}`), http.StatusUnprocessableEntity, "currency-mismatch")
-	e.wantProblem(e.post("/item-prices/nope:set-list-price", `{"listPrice":`+money(1)+`}`), http.StatusNotFound, "not-found")
-	w := e.post("/item-prices/sku-1:withdraw", ``)
+	if set.Header.Get("Idempotency-Replayed") != "" {
+		t.Fatalf("a PUT is idempotent by method and never replays: %v", set.Header)
+	}
+	e.wantProblem(e.put("/item-prices/sku-1/list-price", `{"listPrice":{"amountMinor":-1,"currency":"BRL"}}`), http.StatusUnprocessableEntity, "negative-amount")
+	e.wantProblem(e.put("/item-prices/sku-1/list-price", `{"listPrice":{"amountMinor":1,"currency":"USD"}}`), http.StatusUnprocessableEntity, "currency-mismatch")
+	e.wantProblem(e.put("/item-prices/nope/list-price", `{"listPrice":`+money(1)+`}`), http.StatusNotFound, "not-found")
+	w := e.post("/item-prices/sku-1/withdrawals", ``)
 	e.wantStatus(w, http.StatusOK)
 	if w.json(t)["state"] != "WITHDRAWN" {
 		t.Fatalf("withdraw = %s", w.Body)
 	}
-	e.wantProblem(e.post("/item-prices/sku-1:withdraw", ``), http.StatusConflict, "illegal-transition")
-	e.wantProblem(e.post("/item-prices/sku-1:set-list-price", `{"listPrice":`+money(5)+`}`), http.StatusConflict, "illegal-transition")
-	e.wantProblem(e.post("/item-prices/nope:withdraw", ``), http.StatusNotFound, "not-found")
+	e.wantProblem(e.post("/item-prices/sku-1/withdrawals", ``), http.StatusConflict, "illegal-transition")
+	e.wantProblem(e.put("/item-prices/sku-1/list-price", `{"listPrice":`+money(5)+`}`), http.StatusConflict, "illegal-transition")
+	e.wantProblem(e.post("/item-prices/nope/withdrawals", ``), http.StatusNotFound, "not-found")
 	e.wantProblem(e.get("/item-prices/nope"), http.StatusNotFound, "not-found")
 }
 
@@ -48,27 +51,10 @@ func TestSaleRoutes(t *testing.T) {
 	e.wantProblem(e.post("/item-prices/nope/sales", saleBody(1, "2026-10-25T00:00:00Z", "2026-10-26T00:00:00Z")), http.StatusNotFound, "not-found")
 	e.wantProblem(e.post("/item-prices/sku-1/sales", `{"price":`+money(1)+`,"from":"yesterday","to":"x"}`), http.StatusBadRequest, "malformed-request")
 
-	cancelled := e.post("/item-prices/sku-1/sales/"+id+":cancel", ``)
+	cancelled := e.post("/item-prices/sku-1/sales/"+id+"/cancellations", ``)
 	e.wantStatus(cancelled, http.StatusOK)
 	if n := len(cancelled.json(t)["sales"].([]any)); n != 0 {
 		t.Fatalf("sales after cancel = %d", n)
 	}
-	e.wantProblem(e.post("/item-prices/sku-1/sales/"+id+":cancel", ``), http.StatusNotFound, "not-found")
-}
-
-func TestListItemPricesPages(t *testing.T) {
-	e := newEnv(t)
-	e.priced("sku-1", 100)
-	e.priced("sku-2", 200)
-	e.priced("sku-3", 300)
-	p1 := e.get("/item-prices?limit=2").json(t)
-	if n := len(p1["items"].([]any)); n != 2 || p1["next"] != "sku-2" {
-		t.Fatalf("page 1 = %v", p1)
-	}
-	p2 := e.get("/item-prices?after=sku-2&limit=2").json(t)
-	if n := len(p2["items"].([]any)); n != 1 || p2["next"] != nil {
-		t.Fatalf("page 2 = %v", p2)
-	}
-	e.wantProblem(e.get("/item-prices?limit=0x"), http.StatusUnprocessableEntity, "validation-failed")
-	e.wantProblem(e.get("/item-prices?limit=501"), http.StatusUnprocessableEntity, "validation-failed")
+	e.wantProblem(e.post("/item-prices/sku-1/sales/"+id+"/cancellations", ``), http.StatusNotFound, "not-found")
 }

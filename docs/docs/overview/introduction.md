@@ -63,9 +63,11 @@ real Kafka only: there is no in-memory mode. `warehouse-infra` deploys the chart
 ## Main capabilities
 
 1. Create, change and withdraw item prices (`POST /item-prices`,
-   `:set-list-price`, `:withdraw`), with an optimistic `version` guard.
+   `PUT /item-prices/{catalogItemId}/list-price`,
+   `POST /item-prices/{catalogItemId}/withdrawals`), with an optimistic `version`
+   guard.
 2. Schedule and cancel sale windows (`POST /item-prices/{catalogItemId}/sales`,
-   `.../sales/{saleId}:cancel`); the effective price is computed at read time and
+   `POST .../sales/{saleId}/cancellations`); the effective price is computed at read time and
    `ItemPriceChanged` is published when a window opens or closes.
 3. Publish delivery charge schedules and tax tables as new versions and read the
    current ones.

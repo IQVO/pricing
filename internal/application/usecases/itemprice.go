@@ -52,7 +52,7 @@ func (d Deps) persist(ctx context.Context, p *itemprice.ItemPrice, events []shar
 }
 
 // SetListPrice is the command SetListPrice on a priced item
-// (POST /item-prices/{catalogItemId}:set-list-price).
+// (PUT /item-prices/{catalogItemId}/list-price).
 type SetListPrice struct{ Deps }
 
 // SetListPriceInput carries the new list price and the optional optimistic
@@ -132,7 +132,7 @@ func (u ScheduleSale) Execute(ctx context.Context, in ScheduleSaleInput) (views.
 }
 
 // CancelSale is the command CancelSale
-// (POST /item-prices/{catalogItemId}/sales/{saleId}:cancel). It has no event of
+// (POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations). It has no event of
 // its own: cancelling the live sale reverts the effective price, which is
 // published as ItemPriceChanged.
 type CancelSale struct{ Deps }
@@ -154,7 +154,7 @@ func (u CancelSale) Execute(ctx context.Context, catalogItemID, saleID string) (
 }
 
 // WithdrawPrice is the command WithdrawPrice
-// (POST /item-prices/{catalogItemId}:withdraw).
+// (POST /item-prices/{catalogItemId}/withdrawals).
 type WithdrawPrice struct{ Deps }
 
 // Execute withdraws the price and publishes ItemPriceWithdrawn.

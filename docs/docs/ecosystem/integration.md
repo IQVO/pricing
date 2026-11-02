@@ -76,8 +76,10 @@ Service traffic to the pod until a broker answers.
 kind cluster's Kong edge they sit under `/api/pricing` (the path is stripped
 before the service). `checkout` calls `POST /price-quotes` when a session opens
 and reads the quote back at confirm; `product-discovery` pages `GET /item-prices`
-only to bootstrap or rebuild its projection, never on a shopper request. Every
-`POST` takes an `Idempotency-Key`, so a retried caller gets the stored answer.
+only to bootstrap or rebuild its projection, never on a shopper request, following
+`nextCursor` until it is absent. Every `POST` takes an `Idempotency-Key`, so a
+retried caller gets the stored answer (`Idempotency-Replayed: true`); a key reused
+with another request is `409 idempotency-key-reused`.
 Failures are RFC 9457 problems; callers should treat `409 concurrent-update` as
 retryable and `422` as a business refusal.
 

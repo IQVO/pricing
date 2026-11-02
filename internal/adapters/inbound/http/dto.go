@@ -146,22 +146,6 @@ func itemPriceOut(v views.ItemPrice) itemPriceDTO {
 	}
 }
 
-type itemPriceListDTO struct {
-	Items []itemPriceDTO `json:"items"`
-	Next  *string        `json:"next"`
-}
-
-func itemPriceListOut(v views.ItemPriceList) itemPriceListDTO {
-	out := itemPriceListDTO{Items: make([]itemPriceDTO, 0, len(v.Items))}
-	for _, p := range v.Items {
-		out.Items = append(out.Items, itemPriceOut(p))
-	}
-	if v.Next != "" {
-		out.Next = &v.Next
-	}
-	return out
-}
-
 type scheduleDTO struct {
 	ScheduleID string          `json:"scheduleId"`
 	Version    int64           `json:"version"`

@@ -23,7 +23,7 @@ packages and ports of the code, from the
 Every save is conditional on the loaded `version` (optimistic concurrency).
 Full CloudEvents types are on [Domain Events](/docs/ddd/domain-events).
 
-## 1. CreateItemPrice and SetListPrice (REST POST /item-prices and :set-list-price)
+## 1. CreateItemPrice and SetListPrice (REST POST /item-prices and PUT .../list-price)
 
 ```mermaid
 %%{init: {"sequence": {"wrap": true, "width": 120, "actorMargin": 24, "messageMargin": 28, "boxMargin": 6, "noteMargin": 6, "mirrorActors": false}}}%%
@@ -65,6 +65,10 @@ sequenceDiagram
 ```
 
 Source: `internal/application/usecases/itemprice.go` (`CreateItemPrice`, `SetListPrice`), `internal/adapters/inbound/http/{handlers,idempotency}.go`.
+The key lookup applies to `POST /item-prices`; `PUT .../list-price` is idempotent
+by method and skips it. Where the diagram says "store key response, COMMIT" the key
+row, the aggregate change and the outbox rows are one transaction, and a key reused
+with another request is `409 idempotency-key-reused`.
 
 Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice]`
 (`SetListPrice`, invariants), `.read_models[CatalogItemView]`,
@@ -127,7 +131,7 @@ Omitted: `ErrNegativeAmount` and `ErrCurrencyMismatch` (422, same branch as
 the sale rules). A future window emits nothing now; the boundary policy
 publishes when it opens (diagram 8).
 
-## 3. CancelSale (REST POST .../sales/saleId:cancel)
+## 3. CancelSale (REST POST .../sales/saleId/cancellations)
 
 ```mermaid
 %%{init: {"sequence": {"wrap": true, "width": 120, "actorMargin": 24, "messageMargin": 28, "boxMargin": 6, "noteMargin": 6, "mirrorActors": false}}}%%
@@ -209,7 +213,7 @@ Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice]`
 (`WithdrawPrice`, transitions), `.publishes[ItemPriceWithdrawn]`.
 
 Omitted: the HTTP adapter detail. The route is
-`POST /item-prices/{catalogItemId}:withdraw`.
+`POST /item-prices/{catalogItemId}/withdrawals`.
 
 ## 5. WithdrawPrice by policy WithdrawOnDiscontinue (Kafka)
 

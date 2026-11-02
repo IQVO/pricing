@@ -32,7 +32,11 @@ var internalProblem = problem{http.StatusInternalServerError, "internal-error", 
 // Problems the adapter writes itself, before any use case runs.
 var (
 	idempotencyKeyRequired = problem{http.StatusBadRequest, "idempotency-key-required", "Idempotency-Key header is required"}
-	idempotencyKeyReused   = problem{http.StatusUnprocessableEntity, "idempotency-key-reused", "Idempotency-Key was already used with a different request"}
+	idempotencyKeyInvalid  = problem{http.StatusBadRequest, "idempotency-key-invalid", "Idempotency-Key header is malformed"}
+	idempotencyKeyReused   = problem{http.StatusConflict, "idempotency-key-reused", "Idempotency-Key was already used with a different request"}
+	invalidLimit           = problem{http.StatusBadRequest, "invalid-limit", "Invalid limit"}
+	invalidCursor          = problem{http.StatusBadRequest, "invalid-cursor", "Invalid cursor"}
+	unknownQueryParameter  = problem{http.StatusBadRequest, "unknown-query-parameter", "Unknown query parameter"}
 )
 
 func unprocessable(slug, title string) problem {

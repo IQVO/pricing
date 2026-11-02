@@ -33,6 +33,25 @@ func testUnitOfWork(t *testing.T, e Env) {
 	t.Run("a unit that fails rolls back every table", func(t *testing.T) { uowRollsBack(t, e) })
 	t.Run("a unit that succeeds commits everything", func(t *testing.T) { uowCommits(t, e) })
 	t.Run("a nested unit joins the outer one", func(t *testing.T) { uowNests(t, e) })
+	t.Run("a nested unit that fails undoes only itself", func(t *testing.T) { uowNestedFailure(t, e) })
+}
+
+// uowNestedFailure: the use cases retry a whole attempt on ErrConcurrentUpdate,
+// so a failed attempt must leave nothing behind inside the unit it joined.
+func uowNestedFailure(t *testing.T, e Env) {
+	err := e.UoW.Do(ctx(), func(c context.Context) error {
+		fatalIf(t, e.ItemPrices.Save(c, newPrice(t, "sku-keep", 1000)), "outer write")
+		inner := e.UoW.Do(c, func(c context.Context) error {
+			fatalIf(t, e.ItemPrices.Save(c, newPrice(t, "sku-undone", 1000)), "inner write")
+			return errBoom
+		})
+		wantErr(t, inner, errBoom)
+		return nil
+	})
+	fatalIf(t, err, "outer unit")
+	load(t, e, "sku-keep")
+	_, err = e.ItemPrices.Get(ctx(), "sku-undone")
+	wantErr(t, err, ports.ErrNotFound)
 }
 
 func uowRollsBack(t *testing.T, e Env) {

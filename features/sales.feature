@@ -51,7 +51,7 @@ Feature: Sale windows lower the effective price for a period
       {"price":{"amountMinor":800,"currency":"BRL"},"from":"2026-10-24T08:00:00Z","to":"2026-10-25T08:00:00Z"}
       """
     And I remember the response field "saleId" as "sale"
-    When the API posts to "/item-prices/sku-1/sales/sale-1:cancel" with no body
+    When the API posts to "/item-prices/sku-1/sales/sale-1/cancellations" with no body
     Then the API answers 200
     And the response field "effectivePrice.amountMinor" is 1000
     And 3 "ItemPriceChanged" events were published
