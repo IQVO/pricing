@@ -28,31 +28,53 @@ func NewScheduleRepository(pool *pgxpool.Pool) *ScheduleRepository {
 	return &ScheduleRepository{pool: pool}
 }
 
+// queryCurrent scans the single CURRENT row of a versioned pricing table into
+// dest. "No such row" is ports.ErrNotFound and real read failures keep their
+// cause, each named after the entity for runbook greppability.
+func queryCurrent(ctx context.Context, q querier, sql, entity string, dest ...any) error {
+	err := q.QueryRow(ctx, sql).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("current %s: %w", entity, ports.ErrNotFound)
+	}
+	if err != nil {
+		return fmt.Errorf("read the current %s: %w", entity, err)
+	}
+	return nil
+}
+
+// currentInTx reads the CURRENT row of a versioned table inside one read
+// transaction: read scans the row and loads the aggregate's detail rows.
+func currentInTx[T any](ctx context.Context, pool *pgxpool.Pool, read func(querier) (T, error)) (T, error) {
+	var out T
+	err := readTx(ctx, pool, func(q querier, _ string) error {
+		var err error
+		out, err = read(q)
+		return err
+	})
+	return out, err
+}
+
 // Current implements ports.ScheduleRepository.
 func (r *ScheduleRepository) Current(ctx context.Context) (*schedule.DeliveryChargeSchedule, error) {
-	var out *schedule.DeliveryChargeSchedule
-	err := readTx(ctx, r.pool, func(q querier, _ string) error {
+	return currentInTx(ctx, r.pool, func(q querier) (*schedule.DeliveryChargeSchedule, error) {
 		var (
 			s           schedule.Snapshot
 			state       string
 			publishedAt time.Time
 		)
-		err := q.QueryRow(ctx, `SELECT schedule_id, version, state, published_at FROM delivery_charge_schedules WHERE state = 'CURRENT'`).
-			Scan(&s.ID, &s.Version, &state, &publishedAt)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("current delivery charge schedule: %w", ports.ErrNotFound)
-		}
-		if err != nil {
-			return fmt.Errorf("read the current delivery charge schedule: %w", err)
+		if err := queryCurrent(ctx, q,
+			`SELECT schedule_id, version, state, published_at FROM delivery_charge_schedules WHERE state = 'CURRENT'`,
+			"delivery charge schedule", &s.ID, &s.Version, &state, &publishedAt); err != nil {
+			return nil, err
 		}
 		s.State, s.PublishedAt = schedule.State(state), publishedAt.UTC()
-		if s.Tiers, err = loadTiers(ctx, q, s.ID); err != nil {
-			return err
+		tiers, err := loadTiers(ctx, q, s.ID)
+		if err != nil {
+			return nil, err
 		}
-		out, err = schedule.Restore(s)
-		return err
+		s.Tiers = tiers
+		return schedule.Restore(s)
 	})
-	return out, err
 }
 
 func loadTiers(ctx context.Context, q querier, id schedule.ID) ([]schedule.TierCharge, error) {
@@ -125,29 +147,25 @@ func NewTaxTableRepository(pool *pgxpool.Pool) *TaxTableRepository {
 
 // Current implements ports.TaxTableRepository.
 func (r *TaxTableRepository) Current(ctx context.Context) (*tax.TaxTable, error) {
-	var out *tax.TaxTable
-	err := readTx(ctx, r.pool, func(q querier, _ string) error {
+	return currentInTx(ctx, r.pool, func(q querier) (*tax.TaxTable, error) {
 		var (
 			s           tax.Snapshot
 			state       string
 			publishedAt time.Time
 		)
-		err := q.QueryRow(ctx, `SELECT tax_table_id, version, state, published_at FROM tax_tables WHERE state = 'CURRENT'`).
-			Scan(&s.ID, &s.Version, &state, &publishedAt)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("current tax table: %w", ports.ErrNotFound)
-		}
-		if err != nil {
-			return fmt.Errorf("read the current tax table: %w", err)
+		if err := queryCurrent(ctx, q,
+			`SELECT tax_table_id, version, state, published_at FROM tax_tables WHERE state = 'CURRENT'`,
+			"tax table", &s.ID, &s.Version, &state, &publishedAt); err != nil {
+			return nil, err
 		}
 		s.State, s.PublishedAt = tax.State(state), publishedAt.UTC()
-		if s.Bands, err = loadBands(ctx, q, s.ID); err != nil {
-			return err
+		bands, err := loadBands(ctx, q, s.ID)
+		if err != nil {
+			return nil, err
 		}
-		out, err = tax.Restore(s)
-		return err
+		s.Bands = bands
+		return tax.Restore(s)
 	})
-	return out, err
 }
 
 func loadBands(ctx context.Context, q querier, id tax.ID) ([]tax.TaxBand, error) {
