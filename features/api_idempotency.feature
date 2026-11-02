@@ -1,7 +1,8 @@
 Feature: Writes are idempotent on the Idempotency-Key and errors are problem documents
-  The first response below 500 of a (route, key) is stored; the same key with the
-  same body replays it and nothing runs again. The same key with another body is
-  refused as a reuse.
+  The first response below 500 of a key is stored; the same key with the same
+  method, path and body replays it and nothing runs again. The same key with
+  another request is refused as a reuse (409). A key of more than 128 characters
+  is refused as malformed.
 
   Background:
     Given the catalogue item "sku-1" is known
@@ -33,7 +34,25 @@ Feature: Writes are idempotent on the Idempotency-Key and errors are problem doc
       """
       {"catalogItemId":"sku-1","listPrice":{"amountMinor":5,"currency":"BRL"}}
       """
-    Then the API answers 422 with problem "idempotency-key-reused"
+    Then the API answers 409 with problem "idempotency-key-reused"
+
+  Scenario: The same key on another route is refused as a reuse
+    Given the API posts to "/item-prices" with Idempotency-Key "key-3" the body:
+      """
+      {"catalogItemId":"sku-1","listPrice":{"amountMinor":1000,"currency":"BRL"}}
+      """
+    When the API posts to "/item-prices/sku-1/withdrawals" with Idempotency-Key "key-3" the body:
+      """
+      {}
+      """
+    Then the API answers 409 with problem "idempotency-key-reused"
+
+  Scenario: A key longer than 128 characters is refused as invalid
+    When the API posts to "/item-prices" with an Idempotency-Key of 129 characters the body:
+      """
+      {"catalogItemId":"sku-1","listPrice":{"amountMinor":1000,"currency":"BRL"}}
+      """
+    Then the API answers 400 with problem "idempotency-key-invalid"
 
   Scenario: A malformed body is a problem document
     When the API posts to "/item-prices" the body:

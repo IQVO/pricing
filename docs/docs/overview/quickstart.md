@@ -97,7 +97,8 @@ loop, then the relay, then closes the pool.
 ## First calls
 
 REST is unauthenticated. Every `POST` takes an `Idempotency-Key` header of 1 to
-128 characters (`400 idempotency-key-required` without it). Probes first:
+128 printable ASCII characters (`400 idempotency-key-required` without it,
+`400 idempotency-key-invalid` when malformed); a `PUT` takes none. Probes first:
 
 ```bash
 curl -s localhost:18080/healthz
@@ -129,8 +130,8 @@ curl -s localhost:18080/item-prices/sku-1
 The response is an `itemPriceDTO`: `catalogItemId`, `state` (`ACTIVE`), `listPrice`,
 `effectivePrice`, `sales` (always an array) and `version`. Repeating the `POST`
 with the same key and body replays the stored answer with an
-`Idempotent-Replayed: true` header; the same key with another body is
-`422 idempotency-key-reused`.
+`Idempotency-Replayed: true` header; the same key with another body (or on another
+route) is `409 idempotency-key-reused`.
 
 A quote needs a current delivery charge schedule (a charge for **every** tier:
 `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`) and a current tax table:

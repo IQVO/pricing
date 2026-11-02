@@ -101,6 +101,7 @@ func eventually(t *testing.T, within time.Duration, what string, cond func() boo
 
 type reply struct {
 	status int
+	header http.Header
 	body   string
 }
 
@@ -119,16 +120,22 @@ func (s *service) call(t *testing.T, method, path, key, body string) reply {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	return reply{status: resp.StatusCode, body: string(b)}
+	return reply{status: resp.StatusCode, header: resp.Header, body: string(b)}
 }
 
-func (r reply) field(t *testing.T, name string) any {
+// json decodes the body as one JSON object.
+func (r reply) json(t *testing.T) map[string]any {
 	t.Helper()
 	var m map[string]any
 	if err := json.Unmarshal([]byte(r.body), &m); err != nil {
 		t.Fatalf("not JSON: %s", r.body)
 	}
-	return m[name]
+	return m
+}
+
+func (r reply) field(t *testing.T, name string) any {
+	t.Helper()
+	return r.json(t)[name]
 }
 
 func availabilityEvent(id, typ, item string) kafkatest.Message {

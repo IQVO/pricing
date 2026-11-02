@@ -29,8 +29,6 @@ import (
 	"github.com/IQVO/pricing/internal/domain/tax"
 )
 
-type idemKey struct{ route, key string }
-
 // Store is the shared state of the in-memory doubles.
 type Store struct {
 	mu          sync.Mutex
@@ -41,7 +39,7 @@ type Store struct {
 	catalog     map[itemprice.ID]itemprice.CatalogState
 	inbox       map[string]string
 	outbox      []shared.Event
-	idempotency map[idemKey]idempotency.Record
+	idempotency map[string]idempotency.Record
 	clock       ports.Clock
 }
 
@@ -54,7 +52,7 @@ func NewStore(clock ports.Clock) *Store {
 		prices: map[itemprice.ID]itemprice.Snapshot{}, schedules: map[schedule.ID]schedule.Snapshot{},
 		taxTables: map[tax.ID]tax.Snapshot{}, quotes: map[quote.ID]quote.Snapshot{},
 		catalog: map[itemprice.ID]itemprice.CatalogState{}, inbox: map[string]string{},
-		idempotency: map[idemKey]idempotency.Record{}, clock: clock,
+		idempotency: map[string]idempotency.Record{}, clock: clock,
 	}
 }
 

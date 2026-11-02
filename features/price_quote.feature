@@ -49,7 +49,7 @@ Feature: Checkout obtains a binding, expiring price quote
        "groups":[{"groupNo":1,"offerId":"offer-1","tier":"STANDARD","lineNos":[1]}]}
       """
     And I remember the response field "quoteId" as "quote"
-    When the API posts to "/item-prices/sku-2:set-list-price" the body:
+    When the API puts to "/item-prices/sku-2/list-price" the body:
       """
       {"listPrice":{"amountMinor":999,"currency":"BRL"}}
       """

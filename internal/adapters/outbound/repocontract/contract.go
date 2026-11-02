@@ -42,6 +42,7 @@ func Run(t *testing.T, newEnv func(t *testing.T) Env) {
 	t.Helper()
 	suites := map[string]func(*testing.T, Env){
 		"itemprices":  testItemPrices,
+		"listpages":   testListPages,
 		"boundaries":  testBoundaries,
 		"schedules":   testSchedules,
 		"taxtables":   testTaxTables,

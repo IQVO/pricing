@@ -51,6 +51,6 @@ func TestIssuePriceQuoteRefusals(t *testing.T) {
 	missing := `{"cartId":"c","destinationPostalPrefix":"010","lines":[{"catalogItemId":"ghost","quantity":1}],"groups":[{"groupNo":1,"offerId":"o","tier":"STANDARD","lineNos":[1]}]}`
 	e.wantProblem(e.post("/price-quotes", missing), http.StatusUnprocessableEntity, "item-not-priced")
 	e.wantProblem(e.post("/price-quotes", `{"cartId":"c","destinationPostalPrefix":"010","lines":[],"groups":[]}`), http.StatusUnprocessableEntity, "empty-quote")
-	e.wantStatus(e.post("/item-prices/sku-1:withdraw", ``), http.StatusOK)
+	e.wantStatus(e.post("/item-prices/sku-1/withdrawals", ``), http.StatusOK)
 	e.wantProblem(e.post("/price-quotes", one), http.StatusUnprocessableEntity, "item-not-priced")
 }

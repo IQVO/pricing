@@ -145,7 +145,7 @@ components:
       name: ItemPriceWithdrawn
       title: ItemPriceWithdrawn
       summary: An item's price was withdrawn.
-      description: '`type` = `com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn`. Raised by WithdrawPrice (POST /item-prices/{catalogItemId}:withdraw) and by the WithdrawOnDiscontinue policy. A withdrawn item is no longer purchasable. Subject and key = the catalogItemId.'
+      description: '`type` = `com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn`. Raised by WithdrawPrice (POST /item-prices/{catalogItemId}/withdrawals) and by the WithdrawOnDiscontinue policy. A withdrawn item is no longer purchasable. Subject and key = the catalogItemId.'
       contentType: application/cloudevents+json
       tags:
       - name: itemprice
