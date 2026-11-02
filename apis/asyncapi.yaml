@@ -66,7 +66,7 @@ channels:
   offerAvailabilityEvents:
     address: retailnetwork.offer-availability.events
     title: offer-availability integration topic (consumed)
-    description: Produced by offer-availability (Conformist); consumed by pricing with its own consumer group. Idempotent on the CloudEvents id (inbox), dispatch on the full type, tolerant decoding, dead-letter on poison messages.
+    description: Produced by offer-availability (Conformist); consumed by pricing under the consumer group named by OFFER_AVAILABILITY_CONSUMER_GROUP (required at boot). Idempotent on the CloudEvents id (inbox claimed in the same unit of work as the effect), dispatch on the full type, tolerant decoding. A message that is not a valid CloudEvents 1.0 event, or whose type is not handled, is skipped (offset committed). A handled type whose `data` cannot be applied (undecodable, or a catalogItemId that is not a valid id, 1-64 alphanumeric characters with dot, underscore, colon or hyphen) is dead-lettered at once. A transient failure retries the same message with capped exponential backoff (200 ms doubling to 5 s) up to 5 attempts, then the message is dead-lettered. The dead-letter topic is `retailnetwork.offer-availability.events.dlq` (auto-created); it keeps the original key, value and headers plus x-dlq-source-topic, x-dlq-source-partition, x-dlq-source-offset, x-dlq-error and x-dlq-failed-at. The offset is committed only after handling (or dead-lettering) succeeded.
     messages:
       CatalogItemCreated:
         $ref: '#/components/messages/ConsumedCatalogItemCreated'
