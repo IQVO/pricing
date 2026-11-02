@@ -25,10 +25,10 @@ Source: `internal/application/usecases/*.go`,
 | Use case | Trigger | Adapter | Emits |
 | --- | --- | --- | --- |
 | `CreateItemPrice` | Merchandiser | `POST /item-prices` | `ItemPriceChanged` |
-| `SetListPrice` | Merchandiser | `POST /item-prices/{catalogItemId}:set-list-price` | `ItemPriceChanged` when the published view moved |
+| `SetListPrice` | Merchandiser | `PUT /item-prices/{catalogItemId}/list-price` | `ItemPriceChanged` when the published view moved |
 | `ScheduleSale` | Merchandiser | `POST /item-prices/{catalogItemId}/sales` | `ItemPriceChanged` only if the window is already open |
-| `CancelSale` | Merchandiser | `POST /item-prices/{catalogItemId}/sales/{saleId}:cancel` | `ItemPriceChanged` when the live sale was cancelled |
-| `WithdrawPrice` | Merchandiser | `POST /item-prices/{catalogItemId}:withdraw` | `ItemPriceWithdrawn` |
+| `CancelSale` | Merchandiser | `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | `ItemPriceChanged` when the live sale was cancelled |
+| `WithdrawPrice` | Merchandiser | `POST /item-prices/{catalogItemId}/withdrawals` | `ItemPriceWithdrawn` |
 | `PublishChargeSchedule` | Merchandiser | `POST /delivery-charge-schedules` | `DeliveryChargeScheduleChanged` |
 | `PublishTaxTable` | Merchandiser | `POST /tax-tables` | `TaxTableChanged` |
 | `IssuePriceQuote` | `checkout` | `POST /price-quotes` | `PriceQuoteIssued` (analytics topic) |
@@ -38,8 +38,10 @@ Source: `internal/application/usecases/*.go`,
 | `ExpireQuotes` (policy `QuoteTtl`) | Clock, every `POLICY_INTERVAL` | policy loop in `cmd/api` | none |
 | `GetItemPrice`, `ListItemPrices`, `GetCurrentChargeSchedule`, `GetCurrentTaxTable`, `GetPriceQuote` | Callers | `GET` routes; `GetItemPrice` and `GetPriceQuote` also the A2A skills `item_price`, `quote_status` | none |
 
-All `POST` routes require an `Idempotency-Key` header (1 to 128 characters; the
-first response below 500 is stored 24 hours, `internal/adapters/inbound/http/idempotency.go`).
+All `POST` routes require an `Idempotency-Key` header (1 to 128 printable ASCII
+characters; the key is global; the first response below 500 is stored 24 hours in
+the same transaction as the change, `internal/adapters/inbound/http/idempotency.go`).
+`PUT` is idempotent by method and needs none.
 
 ## CreateItemPrice
 
@@ -162,7 +164,8 @@ first response below 500 is stored 24 hours, `internal/adapters/inbound/http/ide
 
 `GetItemPrice` returns state, list price, the effective price **now**, the sale
 windows and the version. `ListItemPrices` pages by `catalogItemId` (`limit`
-1 to 500, default 100, the `next` cursor is the last id of the page) and is meant
+1 to 500, default 100, the opaque `cursor` is the keyset after the last id of the
+page, answered as `nextCursor`) and is meant
 for projection bootstrap and rebuild. The charge schedule and tax table queries
 return the `CURRENT` one or `not-found`. `GetPriceQuote` returns the quote with
 its state computed at read time.
@@ -173,9 +176,11 @@ its state computed at read time.
 a `/problems/<slug>` type; the full table with causes and fixes is on
 [Troubleshooting](/docs/operations/troubleshooting#rest-problem-types). In short:
 `not-found` 404; `overlapping-sale-window`, `non-increasing-version`,
-`concurrent-update`, `illegal-transition` 409; `unknown-catalog-item`,
+`concurrent-update`, `illegal-transition`, `idempotency-key-reused` 409;
+`unknown-catalog-item`,
 `sale-not-below-list`, `incomplete-charge-schedule`, `overlapping-tax-band`,
 `rate-out-of-range`, `item-not-priced`, `empty-quote`, `no-charge-schedule`,
-`no-tax-table`, `negative-amount`, `currency-mismatch`, `validation-failed`,
-`idempotency-key-reused` 422; `malformed-request`, `idempotency-key-required`
+`no-tax-table`, `negative-amount`, `currency-mismatch`, `validation-failed` 422;
+`malformed-request`, `idempotency-key-required`, `idempotency-key-invalid`,
+`invalid-limit`, `invalid-cursor`, `unknown-query-parameter`
 400; anything else `internal-error` 500.

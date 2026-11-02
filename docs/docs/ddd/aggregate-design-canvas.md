@@ -80,10 +80,10 @@ Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice].invariants
 
 | Command | Trigger | Transition |
 | --- | --- | --- |
-| `SetListPrice` | Merchandiser, REST `POST /item-prices` / `POST /item-prices/{catalogItemId}:set-list-price` | `[*] → ACTIVE`, then list-price updates in `ACTIVE` |
+| `SetListPrice` | Merchandiser, REST `POST /item-prices` / `PUT /item-prices/{catalogItemId}/list-price` | `[*] → ACTIVE`, then list-price updates in `ACTIVE` |
 | `ScheduleSale` | Merchandiser, REST `POST /item-prices/{catalogItemId}/sales` | none (adds a window) |
-| `CancelSale` | Merchandiser, REST `POST /item-prices/{catalogItemId}/sales/{saleId}:cancel` | none (removes a window); raises `ItemPriceChanged` when the effective price reverts |
-| `WithdrawPrice` | Merchandiser, REST `POST /item-prices/{catalogItemId}:withdraw`, or `WithdrawOnDiscontinue` on Kafka `CatalogItemDiscontinued` | `ACTIVE → WITHDRAWN`; on a `WITHDRAWN` price `ErrIllegalTransition` |
+| `CancelSale` | Merchandiser, REST `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | none (removes a window); raises `ItemPriceChanged` when the effective price reverts |
+| `WithdrawPrice` | Merchandiser, REST `POST /item-prices/{catalogItemId}/withdrawals`, or `WithdrawOnDiscontinue` on Kafka `CatalogItemDiscontinued` | `ACTIVE → WITHDRAWN`; on a `WITHDRAWN` price `ErrIllegalTransition` |
 
 ### 7. Created Events
 

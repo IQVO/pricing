@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -56,21 +55,16 @@ func (s *Server) handleGetItemPrice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListItemPrices(w http.ResponseWriter, r *http.Request) {
-	limit := 0
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			writeProblem(w, r, unprocessable("validation-failed", "Validation failed"), "limit must be an integer")
-			return
-		}
-		limit = n
+	limit, after, ok := pageParams(w, r)
+	if !ok {
+		return
 	}
-	v, err := s.ListItemPrices.Execute(r.Context(), r.URL.Query().Get("after"), limit)
+	v, err := s.ListItemPrices.Execute(r.Context(), after, limit)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, itemPriceListOut(v))
+	writeJSON(w, http.StatusOK, itemPricePageOut(v))
 }
 
 func (s *Server) handleSetListPrice(w http.ResponseWriter, r *http.Request) {

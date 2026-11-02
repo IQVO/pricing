@@ -53,6 +53,15 @@ type Deps struct {
 	GetPriceQuote usecases.GetPriceQuote
 }
 
+// Card-level identity and media types of this agent. agentName doubles as the
+// Agent Card name and the tag namespace of every skill; the media types are
+// the A2A defaults every mode list is built from.
+const (
+	agentName       = "pricing"
+	contentTypeJSON = "application/json"
+	contentTypeText = "text/plain"
+)
+
 // Card builds this agent's Agent Card (ADR 0007). The surface is two curated,
 // goal-shaped READ skills, not one skill per endpoint: item_price answers
 // "what does this catalogue item sell for right now, and which sales are
@@ -62,7 +71,7 @@ type Deps struct {
 // here, not in a redesign, if that decision is ever reversed.
 func Card(cfg Config) *a2a.AgentCard {
 	return &a2a.AgentCard{
-		Name:        "pricing",
+		Name:        agentName,
 		Description: "Pricing agent for the retail network: answers what a catalogue item sells for right now (state, list price, effective price at this instant, planned and running sale windows) and what a previously issued price quote priced (lines, delivery charges, tax, total, and whether it is still ISSUED or already EXPIRED). It is read-only: it returns what the REST GET routes return and never changes a price, a sale or a quote, and it exposes no cost or margin data.",
 		Version:     cfg.Version,
 		Provider: &a2a.AgentProvider{
@@ -72,16 +81,16 @@ func Card(cfg Config) *a2a.AgentCard {
 		SupportedInterfaces: []*a2a.AgentInterface{
 			a2a.NewAgentInterface(cfg.AgentURL, a2a.TransportProtocolJSONRPC),
 		},
-		DefaultInputModes:  []string{"application/json", "text/plain"},
-		DefaultOutputModes: []string{"application/json", "text/plain"},
+		DefaultInputModes:  []string{contentTypeJSON, contentTypeText},
+		DefaultOutputModes: []string{contentTypeJSON, contentTypeText},
 		Capabilities:       a2a.AgentCapabilities{Streaming: false},
 		Skills: []a2a.AgentSkill{
 			{
 				ID:          skillItemPrice,
 				Name:        "Current price of a catalogue item",
 				Description: "Read of one item price by catalogItemId: its state (ACTIVE or WITHDRAWN), list price, the effective price at this instant (the running sale price, else the list price), every sale window with its saleId, price and from/to instants, and the version. Amounts are minor units of the stated currency. Answers a 404 problem when the item has no price.",
-				Tags:        []string{"pricing", "item-price", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{agentName, "item-price", "read"},
+				InputModes:  []string{contentTypeJSON},
 				Examples: []string{
 					`{"skill":"item_price","arguments":{"catalogItemId":"sku-1"}}`,
 				},
@@ -90,8 +99,8 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillQuoteStatus,
 				Name:        "Status and breakdown of an issued price quote",
 				Description: "Read of one price quote by quoteId: ISSUED or EXPIRED at this instant (a quote past its expiresAt is EXPIRED whether or not the policy stored it yet), the cart it priced, its lines (unit price and line total), the delivery charge per shipment group, tax, total, the price/schedule/tax-table versions it used, and issuedAt/expiresAt. Amounts are minor units of the quote currency. Answers a 404 problem for an unknown quote. It never issues a quote.",
-				Tags:        []string{"pricing", "price-quote", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{agentName, "price-quote", "read"},
+				InputModes:  []string{contentTypeJSON},
 				Examples: []string{
 					`{"skill":"quote_status","arguments":{"quoteId":"quote-1"}}`,
 				},

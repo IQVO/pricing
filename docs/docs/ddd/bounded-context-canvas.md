@@ -136,9 +136,9 @@ To own what a shopper pays. The context:
 
 | Collaborator | Message | Type | Channel | Relationship |
 | --- | --- | --- | --- | --- |
-| Storefront merchandiser (human) | `SetListPrice` | Command | REST `POST /item-prices`, `POST /item-prices/{catalogItemId}:set-list-price` | UI |
-| Storefront merchandiser (human) | `ScheduleSale`, `CancelSale` | Command | REST `POST /item-prices/{catalogItemId}/sales`, `POST /item-prices/{catalogItemId}/sales/{saleId}:cancel` | UI |
-| Storefront merchandiser (human) | `WithdrawPrice` | Command | REST `POST /item-prices/{catalogItemId}:withdraw` | UI |
+| Storefront merchandiser (human) | `SetListPrice` | Command | REST `POST /item-prices`, `PUT /item-prices/{catalogItemId}/list-price` | UI |
+| Storefront merchandiser (human) | `ScheduleSale`, `CancelSale` | Command | REST `POST /item-prices/{catalogItemId}/sales`, `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | UI |
+| Storefront merchandiser (human) | `WithdrawPrice` | Command | REST `POST /item-prices/{catalogItemId}/withdrawals` | UI |
 | Storefront merchandiser (human) | `PublishChargeSchedule` | Command | REST `POST /delivery-charge-schedules` | UI |
 | Storefront merchandiser (human) | `PublishTaxTable` | Command | REST `POST /tax-tables` | UI |
 | Storefront merchandiser (human) | `GetItemPrice` | Query | REST `GET /item-prices/{catalogItemId}` | UI |
@@ -228,7 +228,7 @@ Top terms: **List Price**, **Sale Window**, **Effective Price**,
 ## Open Questions
 
 - **Resolved in the model-fix:** `WithdrawPrice` has the route
-  `POST /item-prices/{catalogItemId}:withdraw`; `CancelSale` raises no event
+  `POST /item-prices/{catalogItemId}/withdrawals`; `CancelSale` raises no event
   of its own (the window-boundary policy emits `ItemPriceChanged` for the
   reverted price); quote expiry is checkout-internal TTL state with no
   `PriceQuoteExpired` event; the schedule and the tax table have the states

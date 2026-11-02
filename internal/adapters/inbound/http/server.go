@@ -18,18 +18,6 @@ import (
 	"github.com/IQVO/pricing/internal/application/usecases"
 )
 
-// Route names under which the Idempotency-Key records are stored.
-const (
-	routeCreateItemPrice = "POST /item-prices"
-	routeSetListPrice    = "POST /item-prices/{catalogItemId}:set-list-price"
-	routeWithdraw        = "POST /item-prices/{catalogItemId}:withdraw"
-	routeScheduleSale    = "POST /item-prices/{catalogItemId}/sales"
-	routeCancelSale      = "POST /item-prices/{catalogItemId}/sales/{saleId}:cancel"
-	routePublishSchedule = "POST /delivery-charge-schedules"
-	routePublishTax      = "POST /tax-tables"
-	routeIssueQuote      = "POST /price-quotes"
-)
-
 // Server holds the use cases the handlers call.
 type Server struct {
 	CreateItemPrice usecases.CreateItemPrice
@@ -87,24 +75,25 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/healthz", handleHealthz)
 	r.Get("/readyz", s.handleReadyz)
 
-	r.With(s.idempotent(routeCreateItemPrice)).Post("/item-prices", s.handleCreateItemPrice)
+	r.With(s.idempotent()).Post("/item-prices", s.handleCreateItemPrice)
 	r.Get("/item-prices", s.handleListItemPrices)
 	r.Get("/item-prices/{catalogItemId}", s.handleGetItemPrice)
-	r.With(s.idempotent(routeSetListPrice)).Post("/item-prices/{catalogItemId}:set-list-price", s.handleSetListPrice)
-	r.With(s.idempotent(routeWithdraw)).Post("/item-prices/{catalogItemId}:withdraw", s.handleWithdraw)
-	r.With(s.idempotent(routeScheduleSale)).Post("/item-prices/{catalogItemId}/sales", s.handleScheduleSale)
-	r.With(s.idempotent(routeCancelSale)).Post("/item-prices/{catalogItemId}/sales/{saleId}:cancel", s.handleCancelSale)
+	// PUT is idempotent by method: no Idempotency-Key middleware (a key is accepted and ignored).
+	r.Put("/item-prices/{catalogItemId}/list-price", s.handleSetListPrice)
+	r.With(s.idempotent()).Post("/item-prices/{catalogItemId}/withdrawals", s.handleWithdraw)
+	r.With(s.idempotent()).Post("/item-prices/{catalogItemId}/sales", s.handleScheduleSale)
+	r.With(s.idempotent()).Post("/item-prices/{catalogItemId}/sales/{saleId}/cancellations", s.handleCancelSale)
 
-	r.With(s.idempotent(routePublishSchedule)).Post("/delivery-charge-schedules", s.handlePublishSchedule)
+	r.With(s.idempotent()).Post("/delivery-charge-schedules", s.handlePublishSchedule)
 	r.Get("/delivery-charge-schedules/current", s.handleGetSchedule)
-	r.With(s.idempotent(routePublishTax)).Post("/tax-tables", s.handlePublishTax)
+	r.With(s.idempotent()).Post("/tax-tables", s.handlePublishTax)
 	r.Get("/tax-tables/current", s.handleGetTax)
 
-	r.With(s.idempotent(routeIssueQuote)).Post("/price-quotes", s.handleIssueQuote)
+	r.With(s.idempotent()).Post("/price-quotes", s.handleIssueQuote)
 	r.Get("/price-quotes/{quoteId}", s.handleGetQuote)
 	return r
 }
 
-func (s *Server) idempotent(route string) func(http.Handler) http.Handler {
-	return RequireIdempotencyKey(s.IdempotencyStore, s.Clock, route)
+func (s *Server) idempotent() func(http.Handler) http.Handler {
+	return RequireIdempotencyKey(s.IdempotencyStore, s.Clock)
 }

@@ -211,7 +211,7 @@ older than 24 hours are treated as absent but not deleted) or published
 | Publish a new delivery charge schedule | `POST /delivery-charge-schedules` with `version` greater than the current one and a charge for every tier; the previous one becomes `SUPERSEDED`. Quotes already issued keep the version they used |
 | Publish a new tax table | `POST /tax-tables`, same versioning rule; bands must not overlap |
 | Change the currency | `PRICING_CURRENCY` applies to every price and quote; the service has no conversion. Do not change it on a database that already holds prices |
-| Stop the shopper seeing an item | `POST /item-prices/{catalogItemId}:withdraw`; discontinuation from offer-availability does the same automatically |
+| Stop the shopper seeing an item | `POST /item-prices/{catalogItemId}/withdrawals`; discontinuation from offer-availability does the same automatically |
 | Check what the relay has not shipped | `SELECT count(*) FROM outbox_events WHERE published_at IS NULL` |
 
 ## Dashboards and telemetry

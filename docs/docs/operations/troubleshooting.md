@@ -43,12 +43,14 @@ Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
 | Status | Slug | Cause | Fix |
 | --- | --- | --- | --- |
 | 400 | `malformed-request` | Bad JSON, unknown field, wrong type, body over 64 KiB, or a NUL character in path, query or body | Send exactly the fields of `apis/openapi.yaml` |
-| 400 | `idempotency-key-required` | A `POST` without an `Idempotency-Key` header, or longer than 128 characters | Send a unique key per logical request |
-| 422 | `idempotency-key-reused` | The same key with a different method, path, query or body (records live 24 h) | Use a new key, or resend the identical request to get the replay |
+| 400 | `idempotency-key-required` | A `POST` without an `Idempotency-Key` header | Send a unique key per logical request |
+| 400 | `idempotency-key-invalid` | An `Idempotency-Key` that is longer than 128 characters or has a byte outside printable ASCII | Send 1 to 128 printable ASCII characters, e.g. a UUID |
+| 400 | `invalid-limit` / `invalid-cursor` / `unknown-query-parameter` | `GET /item-prices` with a `limit` outside 1 to 500, a `cursor` that does not decode, or any parameter other than `limit` and `cursor` (the retired `after`, `offset`, `nextToken`, `from`) | Page with `limit` and the `nextCursor` of the previous page |
+| 409 | `idempotency-key-reused` | The same key with a different method, path or body (records live 24 h) | Use a new key, or resend the identical request to get the replay; this is a client bug, do not retry blindly |
 | 404 | `not-found` | Unknown item price, quote or sale id, or no current schedule or tax table on `GET .../current` | Create it first |
 | 409 | `overlapping-sale-window` | The new sale window overlaps a live one of the same item | Cancel the other sale or choose another window |
 | 409 | `non-increasing-version` | Published `version` of a schedule or tax table is not above the current one | Publish current version + 1 |
-| 409 | `concurrent-update` | A version mismatch: `set-list-price` with a stale `version`, a second create for the same item, or a lost race after the in-process retry (2 attempts for commands, 5 for consumed events) | Re-read the resource and retry |
+| 409 | `concurrent-update` | A version mismatch: `PUT .../list-price` with a stale `version`, a second create for the same item, or a lost race after the in-process retry (2 attempts for commands, 5 for consumed events) | Re-read the resource and retry |
 | 409 | `illegal-transition` | A command on a `WITHDRAWN` price (set list price, schedule or cancel a sale, withdraw again) | A withdrawn price is never revived (ADR 0002 A3) |
 | 422 | `unknown-catalog-item` | The item is unknown or `DISCONTINUED` in the local `catalog_items` view | Check the offer-availability consumer is running and the `CatalogItemCreated` event arrived |
 | 422 | `sale-not-below-list` | A sale price is not below the list price, or a new list price is not above an existing sale price | Lower the sale or raise the list price |
@@ -82,7 +84,7 @@ Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
 | A partition stops advancing | A message cannot be dead-lettered (the DLQ publish retries forever) | ERROR `offer-availability dead-letter publish failed; retrying the same message` | Make the DLQ topic writable (auto-creation or create it by hand) |
 | Messages on `retailnetwork.offer-availability.events.dlq` | A payload that can never apply (invalid `catalogItemId`) or five failed transient attempts | Headers `x-dlq-error`, `x-dlq-source-offset` | Fix the cause and re-publish the value to the source topic |
 | WARN `skipping a message that is not a valid CloudEvent` | A message that is not CloudEvents 1.0 JSON on the topic | `topic`, `consumer` in the line | Fix the producer; the message is committed past |
-| A discontinued item still has an active price | The `CatalogItemDiscontinued` event was not consumed, or the price was already `WITHDRAWN` | `catalog_items.state` and `item_prices.state` | Withdraw manually with `POST /item-prices/{catalogItemId}:withdraw` |
+| A discontinued item still has an active price | The `CatalogItemDiscontinued` event was not consumed, or the price was already `WITHDRAWN` | `catalog_items.state` and `item_prices.state` | Withdraw manually with `POST /item-prices/{catalogItemId}/withdrawals` |
 
 ## A2A agent
 

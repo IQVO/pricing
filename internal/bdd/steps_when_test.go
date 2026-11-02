@@ -27,6 +27,12 @@ func registerWhen(sc *godog.ScenarioContext, get func() *world) {
 		w.seq++
 		return w.send("POST", path, fmt.Sprintf("auto-%d", w.seq), "")
 	})
+	sc.Step(`^the API posts to "([^"]*)" with an Idempotency-Key of (\d+) characters the body:$`, func(path string, n int, body *godog.DocString) error {
+		return get().send("POST", path, strings.Repeat("k", n), body.Content)
+	})
+	sc.Step(`^the API puts to "([^"]*)" the body:$`, func(path string, body *godog.DocString) error {
+		return get().send("PUT", path, "", body.Content)
+	})
 	sc.Step(`^the API posts to "([^"]*)" without an Idempotency-Key$`, func(path string) error {
 		return get().send("POST", path, "", "{}")
 	})
