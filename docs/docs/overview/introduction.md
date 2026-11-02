@@ -101,3 +101,7 @@ real Kafka only: there is no in-memory mode. `warehouse-infra` deploys the chart
 Published at [https://iqvo.github.io/pricing/](https://iqvo.github.io/pricing/).
 The cross-context view lives in the aggregator site:
 [Storefront](https://iqvo.github.io/warehouse-docs/storefront/).
+
+:::note[Disclaimer]
+This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
+:::
