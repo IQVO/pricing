@@ -78,4 +78,5 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerGiven(sc, func() *world { return w })
 	registerWhen(sc, func() *world { return w })
 	registerThen(sc, func() *world { return w })
+	registerWave2(sc, func() *world { return w })
 }
