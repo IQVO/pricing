@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -122,17 +123,11 @@ func waitHealthy(t *testing.T, base string) {
 	t.Fatal("the MCP binary never answered /healthz")
 }
 
-// TestMCPBinaryOnRealPostgres boots the REAL entry point (run: embedded
-// migrations, pgx pool, Postgres repositories, router) against a real
-// Postgres, then over Streamable HTTP: /healthz answers, tools/list returns
-// exactly the two read tools, both tools read what the command use cases
-// persisted, an unknown or NUL-carrying id is a not-found tool error (not the
-// 500 a NUL would cause in Postgres), and the reads leave the outbox as it was.
-func TestMCPBinaryOnRealPostgres(t *testing.T) {
-	dsn := pgtest.URL(t)
-	quoteID := seedPricing(t, dsn)
-	rowsBefore := outboxRows(t, dsn)
-
+// startBinary boots the REAL entry point (run: embedded migrations, pgx pool,
+// Postgres repositories, router) on a free port and returns its context and
+// base URL once /healthz answers; the cleanup stops it and awaits the exit.
+func startBinary(t *testing.T, dsn string) (context.Context, string) {
+	t.Helper()
 	addr := freeAddr(t)
 	t.Setenv("DATABASE_URL", dsn)
 	t.Setenv("MCP_ADDR", addr)
@@ -148,9 +143,55 @@ func TestMCPBinaryOnRealPostgres(t *testing.T) {
 			t.Error("the MCP binary did not stop after its context was cancelled")
 		}
 	})
-
 	base := "http://" + addr
 	waitHealthy(t, base)
+	return ctx, base
+}
+
+// requireReadOnlyL1Tools asserts tools/list is exactly the two read tools,
+// each L1 and annotated read-only.
+func requireReadOnlyL1Tools(t *testing.T, tools []*sdk.Tool) {
+	t.Helper()
+	var names []string
+	for _, tool := range tools {
+		names = append(names, tool.Name)
+		if tool.Meta["com.warehouse/authority"] != "L1" || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
+			t.Fatalf("tool %s is not an L1 read-only tool: meta=%v annotations=%+v", tool.Name, tool.Meta, tool.Annotations)
+		}
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"get_item_price", "get_price_quote"}) {
+		t.Fatalf("tools = %v, want exactly get_item_price and get_price_quote", names)
+	}
+}
+
+// requireNotFound asserts a tool result is the not-found tool error.
+func requireNotFound(t *testing.T, name string, res *sdk.CallToolResult) {
+	t.Helper()
+	if !res.IsError || len(res.Content) == 0 {
+		t.Fatalf("%s: %+v, want a not-found tool error", name, res)
+	}
+	if text, _ := res.Content[0].(*sdk.TextContent); text == nil || !strings.HasPrefix(text.Text, "not-found: ") {
+		t.Fatalf("%s: %+v, want a not-found tool error", name, res)
+	}
+}
+
+// amountMinor reads obj[key].amountMinor from a structured tool result.
+func amountMinor(obj map[string]any, key string) any {
+	money, _ := obj[key].(map[string]any)
+	return money["amountMinor"]
+}
+
+// TestMCPBinaryOnRealPostgres boots the REAL entry point against a real
+// Postgres, then over Streamable HTTP: /healthz answers, tools/list returns
+// exactly the two read tools, both tools read what the command use cases
+// persisted, an unknown or NUL-carrying id is a not-found tool error (not the
+// 500 a NUL would cause in Postgres), and the reads leave the outbox as it was.
+func TestMCPBinaryOnRealPostgres(t *testing.T) {
+	dsn := pgtest.URL(t)
+	quoteID := seedPricing(t, dsn)
+	rowsBefore := outboxRows(t, dsn)
+	ctx, base := startBinary(t, dsn)
 
 	session, err := sdk.NewClient(&sdk.Implementation{Name: "it", Version: "0"}, nil).Connect(ctx, &sdk.StreamableClientTransport{Endpoint: base + "/mcp"}, nil)
 	if err != nil {
@@ -162,16 +203,7 @@ func TestMCPBinaryOnRealPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tools/list: %v", err)
 	}
-	var names []string
-	for _, tool := range tools.Tools {
-		names = append(names, tool.Name)
-		if tool.Meta["com.warehouse/authority"] != "L1" || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
-			t.Fatalf("tool %s is not an L1 read-only tool: meta=%v annotations=%+v", tool.Name, tool.Meta, tool.Annotations)
-		}
-	}
-	if len(names) != 2 || !(names[0] == "get_item_price" && names[1] == "get_price_quote" || names[0] == "get_price_quote" && names[1] == "get_item_price") {
-		t.Fatalf("tools = %v, want exactly get_item_price and get_price_quote", names)
-	}
+	requireReadOnlyL1Tools(t, tools.Tools)
 
 	call := func(name string, args map[string]any) *sdk.CallToolResult {
 		t.Helper()
@@ -183,7 +215,7 @@ func TestMCPBinaryOnRealPostgres(t *testing.T) {
 	}
 	item := call("get_item_price", map[string]any{"catalogItemId": "sku-1"})
 	got, _ := item.StructuredContent.(map[string]any)
-	if item.IsError || got["state"] != "ACTIVE" || got["listPrice"].(map[string]any)["amountMinor"] != float64(1000) || got["effectivePrice"].(map[string]any)["amountMinor"] != float64(800) {
+	if item.IsError || got["state"] != "ACTIVE" || amountMinor(got, "listPrice") != float64(1000) || amountMinor(got, "effectivePrice") != float64(800) {
 		t.Fatalf("get_item_price = %v (isError=%v)", item.StructuredContent, item.IsError)
 	}
 	quote := call("get_price_quote", map[string]any{"quoteId": quoteID})
@@ -191,16 +223,10 @@ func TestMCPBinaryOnRealPostgres(t *testing.T) {
 	if quote.IsError || q["state"] != "ISSUED" || q["quoteId"] != quoteID || q["cartId"] != "cart-1" {
 		t.Fatalf("get_price_quote = %v (isError=%v)", quote.StructuredContent, quote.IsError)
 	}
-	for name, res := range map[string]*sdk.CallToolResult{
-		"unknown item": call("get_item_price", map[string]any{"catalogItemId": "ghost"}),
-		"NUL item":     call("get_item_price", map[string]any{"catalogItemId": "sku\x00-1"}),
-		"unknown":      call("get_price_quote", map[string]any{"quoteId": "ghost"}),
-		"NUL quote":    call("get_price_quote", map[string]any{"quoteId": "q\x00"}),
-	} {
-		if !res.IsError || len(res.Content) == 0 || !strings.HasPrefix(res.Content[0].(*sdk.TextContent).Text, "not-found: ") {
-			t.Fatalf("%s: %+v, want a not-found tool error", name, res)
-		}
-	}
+	requireNotFound(t, "unknown item", call("get_item_price", map[string]any{"catalogItemId": "ghost"}))
+	requireNotFound(t, "NUL item", call("get_item_price", map[string]any{"catalogItemId": "sku\x00-1"}))
+	requireNotFound(t, "unknown quote", call("get_price_quote", map[string]any{"quoteId": "ghost"}))
+	requireNotFound(t, "NUL quote", call("get_price_quote", map[string]any{"quoteId": "q\x00"}))
 
 	if rowsAfter := outboxRows(t, dsn); rowsAfter != rowsBefore {
 		t.Fatalf("outbox rows %d -> %d: the read-only MCP server must write nothing", rowsBefore, rowsAfter)
