@@ -103,8 +103,8 @@ rejections come back in the message as problems, never as JSON-RPC errors.
   a promise, a date or a capacity.
 - **No `warehouse.*` topic.** Pricing neither produces nor consumes any topic of
   the warehouse (WMS/WES) area.
-- **No MCP surface.** There is no `cmd/mcp`.
-- **No authentication** on REST, A2A or Kafka.
+- **No write MCP tool.** `cmd/mcp` is read-only (`get_item_price`, `get_price_quote`, authority L1); issuing a quote and every other write stay REST-only (ADR 0009).
+- **No authentication** on REST, A2A, MCP or Kafka.
 - **No `PriceQuoteExpired` event.** Expiry is a state, readable on the quote and
   inferable from `expiresAt`; `checkout` enforces it at confirm.
 

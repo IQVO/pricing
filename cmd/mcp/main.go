@@ -29,7 +29,7 @@
 //	OTEL_SERVICE_NAME                service.name of spans and metrics (default pricing-mcp)
 //	OTEL_EXPORTER_OTLP_ENDPOINT      Collector OTLP/gRPC endpoint (default telemetry.DefaultEndpoint); export never blocks
 //	SERVICE_VERSION                  service.version, logged at boot too (default dev)
-//	ENVIRONMENT                      deployment.environment.name, logged at boot too (default dev in the boot line, local in telemetry)
+//	ENVIRONMENT                      deployment.environment.name, logged at boot too (default local)
 //
 // GET /healthz is liveness only (and the Kubernetes readiness probe: the
 // server holds no dependency other than Postgres, which each tool call reports
@@ -92,7 +92,7 @@ func run(ctx context.Context) error {
 	defer closeDeps()
 
 	logger.Info("mcp server starting",
-		"version", getenv("SERVICE_VERSION", "dev"), "environment", getenv("ENVIRONMENT", "dev"))
+		"version", getenv("SERVICE_VERSION", "dev"), "environment", getenv("ENVIRONMENT", "local"))
 
 	srv := &http.Server{
 		Addr:              getenv("MCP_ADDR", ":8090"),

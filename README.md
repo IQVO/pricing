@@ -26,8 +26,8 @@ The cross-context design lives in
 | Development | [Testing](https://iqvo.github.io/pricing/docs/development/testing) |
 | Domain-driven design | [Ubiquitous language](https://iqvo.github.io/pricing/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/pricing/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/pricing/docs/ddd/subdomain-classification), [DDD artifacts](https://iqvo.github.io/pricing/docs/ddd/ddd-artifacts) |
 | ddd-crew artifacts | [Core domain chart](https://iqvo.github.io/pricing/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/pricing/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/pricing/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/pricing/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/pricing/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/pricing/docs/ddd/eventstorming), [Class diagram](https://iqvo.github.io/pricing/docs/ddd/class-diagram), [Entity relationship](https://iqvo.github.io/pricing/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/pricing/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/pricing/docs/ddd/domain-events) |
-| API reference | [API overview](https://iqvo.github.io/pricing/docs/api-reference) (REST, A2A), [REST reference generated from `apis/openapi.yaml`](https://iqvo.github.io/pricing/docs/api-reference/rest/pricing-api), [Event catalogue](https://iqvo.github.io/pricing/docs/api-reference/events) |
-| Ecosystem | [Integration](https://iqvo.github.io/pricing/docs/ecosystem/integration) |
+| API reference | [API overview](https://iqvo.github.io/pricing/docs/api-reference) (REST, A2A, MCP), [REST reference generated from `apis/openapi.yaml`](https://iqvo.github.io/pricing/docs/api-reference/rest/pricing-api), [Event catalogue](https://iqvo.github.io/pricing/docs/api-reference/events) |
+| Ecosystem | [Integration](https://iqvo.github.io/pricing/docs/ecosystem/integration), [MCP tools](https://iqvo.github.io/pricing/docs/mcp/tools) |
 | Decisions | [ADR index](https://iqvo.github.io/pricing/docs/adr) and the sources in [`docs/adr/`](docs/adr/) |
 | In this repo | [`docs/docs/operations/runbook.md`](docs/docs/operations/runbook.md), [`docs/docs/operations/before-first-release.md`](docs/docs/operations/before-first-release.md) |
 | Aggregator | [Pricing in the storefront pack](https://iqvo.github.io/warehouse-docs/storefront/contexts/pricing) and the [Storefront strategic design](https://iqvo.github.io/warehouse-docs/storefront/strategic-design/) |
@@ -40,6 +40,7 @@ Hexagonal / ports & adapters; dependencies point **inward only**.
 cmd/api/                    composition root: REST API, outbox relay, the offer-availability
                             consumer and the clock-driven policies
 cmd/a2a/                    read-only A2A agent over the same read use cases (ADR 0007)
+cmd/mcp/                    read-only MCP server over the same read use cases (ADR 0009)
 internal/
   domain/                   pure business logic: itemprice, quote, schedule, tax, shared
   application/
@@ -49,7 +50,7 @@ internal/
     outbox/                 transactional outbox
     views/                  read views (the local CatalogItemView, ADR 0003)
   adapters/
-    inbound/                http (chi), kafka (the consumer), a2a, requestlog
+    inbound/                http (chi), kafka (the consumer), a2a, mcp, requestlog
     outbound/               postgres, kafka, outbox relay, telemetry, clock, ids,
                             memory (test doubles), repocontract
     kafka/cloudevents/      the CloudEvents 1.0 Kafka writer
@@ -64,8 +65,8 @@ enforced as an executable test, not a convention:
 `internal/architecture/architecture_test.go` (`TestHexagonalArchitecture`,
 arch-go) fails the build if the domain ever imports an outer layer or an
 adapter reaches sideways into a sibling; the same package adds fitness tests
-for the event catalogue vs `apis/asyncapi.yaml`, the A2A adapter's read-only
-rule, Kafka writer acks/topics/DLQ shutdown, the outbox relay cap, and
+for the event catalogue vs `apis/asyncapi.yaml`, the A2A adapter's and the MCP
+server's read-only rules (and the agent authority declarations), Kafka writer acks/topics/DLQ shutdown, the outbox relay cap, and
 no-Go-files-at-root.
 
 ## Domain events
@@ -160,6 +161,11 @@ latter is the absolute http(s) URL advertised on the card),
 defaults to `pricing-a2a`; `SERVICE_VERSION` also versions the Agent Card). It
 reads and writes no Kafka topic and runs no outbox relay.
 
+`cmd/mcp` reads `DATABASE_URL` (**required**), `MIGRATIONS_DATABASE_URL`
+(default `DATABASE_URL`), `MCP_ADDR` (default `:8090`), `LOG_LEVEL` and the
+shared telemetry variables (`OTEL_SERVICE_NAME` defaults to `pricing-mcp`). It
+reads and writes no Kafka topic, runs no outbox relay and has no auth variable.
+
 ## Observability
 
 Logs, metrics and traces follow the fleet standard ([ADR
@@ -213,11 +219,32 @@ fleet REST API guideline ([ADR 0008](docs/adr/0008-adopt-the-fleet-rest-api-guid
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness (Postgres ping + Kafka metadata) |
 
+## MCP
+
+`cmd/mcp` ([ADR 0009](docs/adr/0009-read-only-mcp-server.md)) is a read-only
+[Model Context Protocol](https://modelcontextprotocol.io) server over
+Streamable HTTP (stateless, no auth, by fleet decision), mounted at `/mcp` and
+`/` on `MCP_ADDR` (default `:8090`) with `GET /healthz` for the probes. Every
+tool is authority `L1` and wraps a query use case that already backs a REST
+`GET`:
+
+| Tool | Input | Backing REST route |
+|---|---|---|
+| `get_item_price` | `catalogItemId` | `GET /item-prices/{catalogItemId}` |
+| `get_price_quote` | `quoteId` | `GET /price-quotes/{quoteId}` |
+
+Plus one resource, `warehouse://pricing/item-prices/{catalogItemId}`, and one
+prompt, `explain_item_price`. A failure is an `isError` tool result prefixed
+with the REST slug (`not-found`, `validation-failed`). Issuing a quote and
+every other write stay REST-only. Per-tool detail:
+[MCP tools](https://iqvo.github.io/pricing/docs/mcp/tools).
+
 ## Helm chart
 
 [`charts/pricing`](charts/pricing) — one always-on component: the `api`
 Deployment (REST, relay, consumer and policies in one process); the read-only
-A2A agent is an optional extra component (`a2a.enabled=true`, default off).
+A2A agent and the read-only MCP server are optional extra components
+(`a2a.enabled=true`, `mcp.enabled=true`, both default off).
 The chart refuses to render without `database.*`, `kafka.brokers` and
 `config.offerAvailabilityConsumerGroup` (named in the failure). `DATABASE_URL`
 always comes from a Secret.
@@ -256,6 +283,23 @@ Two skills, called as a `SendMessage` data part
 Rejections come back as an in-band RFC 7807 `problem` with the REST status
 class (`404` unknown id, `400` malformed request). A2A carries delegation
 only; facts still leave as CloudEvents on Kafka.
+
+### Running the MCP server in Kubernetes
+
+`cmd/mcp` ([ADR 0009](docs/adr/0009-read-only-mcp-server.md)) is a third
+binary in the same image (`/app/mcp`). The Helm chart deploys it as
+`<release>-mcp` (Deployment and Service on `:8090`) when `mcp.enabled=true`
+(default `false`), routed at `/api/mcp/pricing` (rewritten to `/mcp`) when
+`mcp.route.enabled=true`. It needs Postgres only: it renders no Kafka, outbox
+or consumer variable, mounts no ConfigMap and has no auth setting.
+
+```sh
+helm upgrade --install pricing ./charts/pricing \
+  --set database.existingSecret=pricing-db \
+  --set kafka.brokers=kafka:9092 \
+  --set config.offerAvailabilityConsumerGroup=pricing-offer-availability \
+  --set mcp.enabled=true
+```
 
 ## Local development / quality gate
 
@@ -302,11 +346,11 @@ publish) run only on pushes to `main`, after every other job is green.
 
 ## Architecture Decision Records
 
-[`docs/adr/`](docs/adr/) — 8 ADRs (0001 bounded context, 0002 assumptions,
+[`docs/adr/`](docs/adr/) — 9 ADRs (0001 bounded context, 0002 assumptions,
 0003 consumed contracts and local read model, 0004 CloudEvents envelope and
 type catalogue, 0005 fleet observability standard, 0006 dataschema stream
 segment names the actual stream, 0007 A2A inbound adapter, 0008 adopt the fleet
-REST API guideline).
+REST API guideline, 0009 read-only MCP server).
 
 ## License
 

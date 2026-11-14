@@ -67,9 +67,13 @@ proving it fails on a bad fixture):
 | `TestPostgresIntegrationTestsUseTestcontainers`, `TestKafkaIntegrationTestsUseTestcontainers` | Integration tests boot their own containers, no `DATABASE_URL` gate or `t.Skip` |
 | `TestA2AAdapterDependsOnlyInward`, `TestNothingDependsOnTheA2AAdapter`, `TestNoOutboundA2AClient`, `TestA2AAgentIsReadOnly`, `TestA2ABinaryHasNoKafkaOrRelay` | The A2A adapter reads only, calls no one, and `cmd/a2a` has no Kafka or relay |
 
-The package also carries the template's MCP sensors
-(`TestMCPAdapterDependencyRule`, `TestMCPOptionalToolInputsCarryOmitempty`);
-Pricing has no MCP binary, so they have nothing to check here.
+The package also carries the fleet MCP sensors:
+`TestMCPAdapterDependencyRule`, `TestMCPOptionalToolInputsCarryOmitempty`,
+the authority sensors (every tool and A2A skill declares an authority level) and
+`TestMCPServerIsReadOnly`, `TestMCPBinaryHasNoKafkaOrRelay` and
+`TestMCPSensorsBite` (the MCP adapter and `cmd/mcp` name query use cases only and
+`cmd/mcp` has no Kafka or relay). The adapter's own tests add the pinned tool
+registry golden, the surface (1 resource, 1 prompt) and stateless transport tests.
 
 ### Mutation testing
 

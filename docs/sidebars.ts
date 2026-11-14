@@ -71,7 +71,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Ecosystem',
-      items: ['ecosystem/integration'],
+      items: ['ecosystem/integration', 'mcp/tools'],
     },
     {
       type: 'category',
@@ -116,6 +116,11 @@ const sidebars: SidebarsConfig = {
           type: 'link',
           label: '0007 A2A inbound adapter',
           href: '/docs/adr/0007-a2a-inbound-adapter',
+        },
+        {
+          type: 'link',
+          label: '0009 A read-only MCP server with authority levels and a complete surface',
+          href: '/docs/adr/0009-read-only-mcp-server',
         },
       ],
     },
