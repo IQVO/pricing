@@ -1,0 +1,294 @@
+[
+  {
+    "_meta": {
+      "com.warehouse/authority": "L1"
+    },
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read what one catalogue item sells for: its state (ACTIVE or WITHDRAWN), the list price, the effective price at this instant (the running sale price, else the list price), every sale window (saleId, price, from and to instants) and the version. Amounts are minor units of the stated currency. Read-only; an item with no price fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalogItemId": {
+          "description": "the catalogue item id whose price is read, e.g. sku-1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalogItemId"
+      ],
+      "type": "object"
+    },
+    "name": "get_item_price",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalogItemId": {
+          "type": "string"
+        },
+        "effectivePrice": {
+          "additionalProperties": false,
+          "properties": {
+            "amountMinor": {
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amountMinor",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "listPrice": {
+          "additionalProperties": false,
+          "properties": {
+            "amountMinor": {
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amountMinor",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "sales": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "price": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinor": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "saleId": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "saleId",
+              "price",
+              "from",
+              "to"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "catalogItemId",
+        "state",
+        "listPrice",
+        "effectivePrice",
+        "sales",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "_meta": {
+      "com.warehouse/authority": "L1"
+    },
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one price quote: ISSUED or EXPIRED at this instant (a quote past its expiresAt is EXPIRED whether or not the policy stored it yet), the cart it priced, its lines (unit price and line total), the delivery charge per shipment group, tax, total, the price, charge schedule and tax table versions it used, and issuedAt and expiresAt. Amounts are minor units of the quote currency. Read-only: it never issues a quote; an unknown id fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "quoteId": {
+          "description": "the price quote id, as returned when the quote was issued",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quoteId"
+      ],
+      "type": "object"
+    },
+    "name": "get_price_quote",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "groups": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deliveryCharge": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinor": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "groupNo": {
+                "type": "integer"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "groupNo",
+              "tier",
+              "deliveryCharge"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "issuedAt": {
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "catalogItemId": {
+                "type": "string"
+              },
+              "lineTotal": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinor": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "quantity": {
+                "type": "integer"
+              },
+              "unitPrice": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinor": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "quantity",
+              "unitPrice",
+              "lineTotal"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "quoteId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "taxMinor": {
+          "type": "integer"
+        },
+        "totalMinor": {
+          "type": "integer"
+        },
+        "versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "quoteId",
+        "cartId",
+        "state",
+        "currency",
+        "lines",
+        "groups",
+        "taxMinor",
+        "totalMinor",
+        "versions",
+        "issuedAt",
+        "expiresAt"
+      ],
+      "type": "object"
+    }
+  }
+]
