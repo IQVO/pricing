@@ -1,7 +1,8 @@
 package architecture
 
-// A2A inbound adapter fitness (ADR 0007). pricing has no MCP surface, so the
-// agent is READ-ONLY by construction and these sensors pin that construction:
+// A2A inbound adapter fitness (ADR 0007). The agent is READ-ONLY by
+// construction (it mirrors the two reads the MCP server of ADR 0009 offers)
+// and these sensors pin that construction:
 //
 //   - TestA2AAdapterDependsOnlyInward: internal/adapters/inbound/a2a imports
 //     only the application layer and the domain: never an outbound adapter,
@@ -28,10 +29,11 @@ import (
 	"testing"
 )
 
+// a2aAdapterDir is declared by mcp_authority_fitness_test.go (the fleet's
+// copied sensor) with the same value "../adapters/inbound/a2a".
 const (
-	a2aAdapterDir = "../adapters/inbound/a2a"
-	a2aCmdDir     = "../../cmd/a2a"
-	modulePrefix  = modulePath + "/internal/"
+	a2aCmdDir    = "../../cmd/a2a"
+	modulePrefix = modulePath + "/internal/"
 )
 
 // a2aAllowedUseCases are the two queries the agent may call (the use cases of

@@ -8,13 +8,16 @@ description: "Deploy, probe, roll back and operate Pricing: Helm chart, readines
 # Pricing: operations runbook
 
 Pricing owns item prices, charge schedules, sales, tax tables and price quotes
-in one configured currency. It ships two deployables from one image:
+in one configured currency. It ships three deployables from one image:
 
 - **`cmd/api`** (the `api` Deployment): REST, the transactional outbox relay,
   the offer-availability consumer and the clock-driven policy loop in a single
   process. Always on.
 - **`cmd/a2a`** (the `<release>-a2a` Deployment): the read-only A2A agent.
   Optional (`a2a.enabled`, default `false`), needs Postgres only.
+- **`cmd/mcp`** (the `<release>-mcp` Deployment): the read-only MCP server
+  (`get_item_price`, `get_price_quote`). Optional (`mcp.enabled`, default
+  `false`), needs Postgres only.
 
 Runtime: real Postgres and real Kafka only. There is no in-memory or permissive
 mode, so a pod that cannot reach either refuses to boot and never pretends to
@@ -76,6 +79,23 @@ gateway URL when the agent must be reachable off-cluster. With
 value: if the Deployment has a `KAFKA_BROKERS` variable, something outside the
 chart added it.
 
+### The MCP server
+
+```sh
+helm upgrade --install pricing charts/pricing -n pricing --reuse-values \
+  --set mcp.enabled=true
+kubectl -n pricing rollout status deployment/pricing-mcp
+```
+
+The server listens on `mcp.httpAddr` (`:8090`; the chart refuses a port that
+differs from `mcp.service.targetPort`) and serves Streamable HTTP at `/mcp` and
+`/`. In the cluster it is `http://<release>-mcp.<ns>.svc.cluster.local:8090/mcp`.
+With `mcp.route.enabled=true` the chart renders an HTTPRoute at
+`/api/mcp/pricing` (rewritten to `/mcp`). Like the agent it mounts neither the
+api ConfigMap nor any Kafka value, and no top-level `extraEnv` reaches it.
+Check it with `tools/list`: exactly `get_item_price` and `get_price_quote`, each
+with `_meta` `com.warehouse/authority` `L1`.
+
 ## Rollback
 
 ```sh
@@ -94,7 +114,7 @@ offsets with no replay storm.
 
 | Endpoint | Binary | Meaning |
 | --- | --- | --- |
-| `GET /healthz` | api, a2a | Liveness only; startup and liveness probes. The a2a agent also uses it as readiness |
+| `GET /healthz` | api, a2a, mcp | Liveness only; startup and liveness probes. The a2a agent and the mcp server also use it as readiness |
 | `GET /readyz` | api | `200` only while Postgres answers a ping **and** a Kafka broker answers a metadata request (verdict cached 3s, bounded 2s). Flips to `503` first during shutdown, before the listener drains |
 
 Startup probe: `/healthz`, every 2s, 30 failures (about 60s). The migrations
@@ -194,7 +214,7 @@ the effective price is computed at read time.
 The service connects as role `pricing` (its own schema only). Boot migrations
 run against `MIGRATIONS_DATABASE_URL` (a direct, session-mode connection); when
 the pooled DSN goes through a transaction-mode pooler, keep the direct key
-populated or migrations hang. Both binaries run the same embedded, idempotent
+populated or migrations hang. All binaries run the same embedded, idempotent
 migrations at boot.
 
 Tables: `item_prices`, `sale_windows`, `delivery_charge_schedules`,

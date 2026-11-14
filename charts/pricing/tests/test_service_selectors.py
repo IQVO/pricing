@@ -10,10 +10,11 @@ EXACTLY ONE Deployment. This test fails if that ever stops being true.
 
 pricing has one component by default, the api (REST, the outbox relay, the
 offer-availability consumer and the clock-driven policy loop in one process),
-and one optional component, the read-only A2A agent (a2a.enabled, ADR 0007).
-There is no mcp and no frontend: the chart renders nothing for binaries that do
-not exist. The checks run with every optional template (HPA, Ingress, HTTPRoute,
-the A2A agent and its route) enabled together.
+and two optional read-only ones: the A2A agent (a2a.enabled, ADR 0007) and the
+MCP server (mcp.enabled, ADR 0009). There is no frontend: the chart renders
+nothing for binaries that do not exist. The checks run with every optional
+template (HPA, Ingress, HTTPRoute, the A2A agent and its route, the MCP server
+and its route) enabled together.
 
 Run: python3 charts/pricing/tests/test_service_selectors.py
 Needs: helm, PyYAML.
@@ -28,6 +29,7 @@ from pathlib import Path
 CHART_DIR = Path(__file__).resolve().parents[1]
 RELEASE = "pricing"
 A2A = f"{RELEASE}-a2a"
+MCP = f"{RELEASE}-mcp"
 
 # Dummy values, no password: the chart refuses to render without a database
 # source, the Kafka brokers and the offer-availability consumer group. None is
@@ -59,6 +61,10 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "a2a.route.enabled=true",
     "--set", "a2a.route.parentRefs[0].name=warehouse-gateway",
     "--set", "a2a.route.parentRefs[0].namespace=kong",
+    "--set", "mcp.enabled=true",
+    "--set", "mcp.route.enabled=true",
+    "--set", "mcp.route.parentRefs[0].name=warehouse-gateway",
+    "--set", "mcp.route.parentRefs[0].namespace=kong",
     "--set", "config.currency=USD",
     "--set", "config.policyInterval=2s",
     "--set", "config.outboxRelayInterval=2s",
@@ -80,6 +86,10 @@ A2A_FORBIDDEN_ENV = {
     "KAFKA_BROKERS", "EVENT_PUBLISHER", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
     "OFFER_AVAILABILITY_CONSUMER_GROUP", "POLICY_INTERVAL", "PRICING_CURRENCY", "HTTP_ADDR", "SHUTDOWN_DRAIN_DELAY",
 }
+
+# What the MCP server (cmd/mcp) must render, and what must never reach it.
+MCP_ENV = ("MCP_ADDR", "DATABASE_URL", "MIGRATIONS_DATABASE_URL", "LOG_LEVEL")
+MCP_FORBIDDEN_ENV = A2A_FORBIDDEN_ENV | {"A2A_ADDR", "A2A_AGENT_URL"}
 
 
 def helm_template(extra_args: list[str]) -> subprocess.CompletedProcess:
@@ -129,11 +139,11 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
     services = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Service"}
     deployments = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Deployment"}
 
-    if set(deployments) != {RELEASE, A2A}:
-        failures.append(f"the chart has the api and the a2a Deployments, rendered: {sorted(deployments)}")
-    if set(services) != {RELEASE, A2A}:
-        failures.append(f"the chart has the api and the a2a Services, rendered: {sorted(services)}")
-    for name, component in ((RELEASE, "api"), (A2A, "a2a")):
+    if set(deployments) != {RELEASE, A2A, MCP}:
+        failures.append(f"the chart has the api, the a2a and the mcp Deployments, rendered: {sorted(deployments)}")
+    if set(services) != {RELEASE, A2A, MCP}:
+        failures.append(f"the chart has the api, the a2a and the mcp Services, rendered: {sorted(services)}")
+    for name, component in ((RELEASE, "api"), (A2A, "a2a"), (MCP, "mcp")):
         if name not in services:
             failures.append(f"the {component} Service was not rendered")
         elif selector_of(services[name]).get("app.kubernetes.io/component") != component:
@@ -155,8 +165,8 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
         if len(hit) != 1:
             failures.append(f"Service {svc_name} selects {len(hit)} Deployments {sorted(hit)}; expected exactly 1")
 
-    # Ingress and the api HTTPRoute route to the api Service only; the a2a
-    # HTTPRoute routes to the a2a Service only; the HPA owns the api replicas.
+    # Ingress and the api HTTPRoute route to the api Service only; the a2a and
+    # mcp HTTPRoutes route to their own Service only; the HPA owns the api replicas.
     for d in docs:
         if d.get("kind") == "Ingress":
             backends = {p["backend"]["service"]["name"] for r in d["spec"]["rules"] for p in r["http"]["paths"]}
@@ -164,7 +174,7 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
                 failures.append(f"the Ingress must route to the api Service only, got {sorted(backends)}")
         if d.get("kind") == "HTTPRoute":
             backends = {b["name"] for r in d["spec"]["rules"] for b in r["backendRefs"]}
-            want = {A2A} if d["metadata"]["name"] == A2A else {RELEASE}
+            want = {d["metadata"]["name"]} if d["metadata"]["name"] in (A2A, MCP) else {RELEASE}
             if backends != want:
                 failures.append(f"the HTTPRoute {d['metadata']['name']} must route to {sorted(want)} only, got {sorted(backends)}")
     hpa = next((d for d in docs if d.get("kind") == "HorizontalPodAutoscaler"), None)
@@ -174,6 +184,7 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
         failures.append("the api Deployment must omit replicas when its HPA owns them")
 
     check_a2a(deployments.get(A2A), failures)
+    check_mcp(deployments.get(MCP), failures)
 
     api = deployments.get(RELEASE)
     if api is None:
@@ -215,6 +226,29 @@ def check_a2a(dep: dict | None, failures: list[str]) -> None:
         failures.append("the a2a Deployment must not mount the api ConfigMap")
 
 
+def check_mcp(dep: dict | None, failures: list[str]) -> None:
+    """The MCP server is read-only: Postgres only, no Kafka/outbox/consumer variable."""
+    if dep is None:
+        failures.append("the mcp Deployment was not rendered")
+        return
+    names = env_names(dep)
+    for want in MCP_ENV:
+        if want not in names:
+            failures.append(f"the mcp Deployment does not render {want}")
+    stray = sorted(set(names) & MCP_FORBIDDEN_ENV)
+    if stray:
+        failures.append(f"the read-only mcp Deployment renders {stray}")
+    if [n for n in names if n.endswith("_CONSUMER_GROUP") or "KAFKA" in n or "OUTBOX" in n]:
+        failures.append("the read-only mcp Deployment renders a Kafka/outbox/consumer variable")
+    container = dep["spec"]["template"]["spec"]["containers"][0]
+    if container.get("command") != ["/app/mcp"]:
+        failures.append("the mcp Deployment must run /app/mcp")
+    if env_value(dep, "MCP_ADDR") != ":8090":
+        failures.append(f"the mcp server must listen on :8090, renders {env_value(dep, 'MCP_ADDR')!r}")
+    if "envFrom" in container:
+        failures.append("the mcp Deployment must not mount the api ConfigMap")
+
+
 def check_refusals(failures: list[str]) -> None:
     cases: list[tuple[str, list[str], str]] = [
         ("without a database source", runtime("database"), "requires database.url or database.existingSecret"),
@@ -231,6 +265,8 @@ def check_refusals(failures: list[str]) -> None:
         ("an http address on another port than the container's", BASE + ["--set", "config.httpAddr=:9090"], "config.httpAddr"),
         ("an a2a address on another port than the a2a container's",
          BASE + ["--set", "a2a.enabled=true", "--set", "a2a.httpAddr=:9090"], "a2a.httpAddr"),
+        ("an mcp address on another port than the mcp container's",
+         BASE + ["--set", "mcp.enabled=true", "--set", "mcp.httpAddr=:9090"], "mcp.httpAddr"),
     ]
     for key in GROUPS:
         cases.append((f"without config.{key}", runtime(key), f"config.{key} is required"))
@@ -245,14 +281,14 @@ def main() -> int:
 
     check_components(render(ENABLE_EVERYTHING), failures)
 
-    # Default values must not deploy an HPA, a route or the A2A agent, nor any optional env.
+    # Default values must not deploy an HPA, a route, the A2A agent or the MCP server, nor any optional env.
     defaults = render(BASE)
     stray = [d["kind"] for d in defaults if d.get("kind") in {"HorizontalPodAutoscaler", "Ingress", "HTTPRoute"}]
     if stray:
         failures.append(f"optional templates rendered with default values: {stray}")
-    a2a_defaults = [d["kind"] for d in defaults if d["metadata"]["name"] == A2A]
-    if a2a_defaults:
-        failures.append(f"the a2a agent rendered with default values: {a2a_defaults}")
+    optional_defaults = [d["kind"] for d in defaults if d["metadata"]["name"] in (A2A, MCP)]
+    if optional_defaults:
+        failures.append(f"the a2a agent or the mcp server rendered with default values: {optional_defaults}")
     dep = next(d for d in defaults if d.get("kind") == "Deployment")
     names = env_names(dep)
     off = {"PRICING_CURRENCY", "POLICY_INTERVAL", "OUTBOX_RELAY_INTERVAL", "SHUTDOWN_DRAIN_DELAY"}
@@ -269,8 +305,8 @@ def main() -> int:
             print(f"FAIL: {f}")
         return 1
 
-    print("PASS: each Service selects exactly one Deployment (the api; the read-only a2a agent when enabled); the HPA, Ingress, "
-          "HTTPRoute and a2a agent are off by default, and each route targets its own Service; every cmd/api env var has a dedicated value; the chart refuses to render without a "
+    print("PASS: each Service selects exactly one Deployment (the api; the read-only a2a agent and mcp server when enabled); the HPA, Ingress, "
+          "HTTPRoute, a2a agent and mcp server are off by default, and each route targets its own Service; every cmd/api env var has a dedicated value; the chart refuses to render without a "
           "database source, brokers or the consumer group, with a *_MODE or a consumer group in extraEnv, with a grace "
           "period that does not exceed the shutdown bounds, or with an http address off the container port")
     return 0

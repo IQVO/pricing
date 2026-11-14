@@ -8,10 +8,11 @@ tier (`DeliveryChargeSchedule`), a synthetic tax table (`TaxTable`), and the
 binding, immutable, expiring `PriceQuote` a checkout session is confirmed
 against. One configured currency (`PRICING_CURRENCY`), integer minor units;
 promotions are a later phase. It keeps a local `CatalogItemView` fed by
-offer-availability's events. It ships two binaries: `cmd/api` (REST + outbox
-relay + the offer-availability consumer + the clock-driven policies) and
-`cmd/a2a` (read-only A2A, `:8093`, skills `item_price` and `quote_status`).
-No MCP server, no `web/`.
+offer-availability's events. It ships three binaries: `cmd/api` (REST + outbox
+relay + the offer-availability consumer + the clock-driven policies),
+`cmd/a2a` (read-only A2A, `:8093`, skills `item_price` and `quote_status`) and
+`cmd/mcp` (read-only MCP, `:8090`, tools `get_item_price` and `get_price_quote`,
+authority L1, ADR 0009). No `web/`.
 
 ## Hard rules (each one cost an incident or is fitness-tested)
 

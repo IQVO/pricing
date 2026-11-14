@@ -1,7 +1,8 @@
 # Default values for pricing. One component by default: the api Deployment
 # (cmd/api: REST, the outbox relay, the offer-availability consumer and the
 # clock-driven policy loop in one process); the read-only A2A agent
-# (cmd/a2a) is a second, optional one (a2a.enabled, default false). The chart refuses to render without the
+# (cmd/a2a) and the read-only MCP server (cmd/mcp) are optional ones
+# (a2a.enabled and mcp.enabled, both default false). The chart refuses to render without the
 # mandatory values below (named in the failure): database.*, kafka.brokers and
 # config.offerAvailabilityConsumerGroup.
 
@@ -228,6 +229,43 @@ a2a:
   route:
     enabled: false
     path: "/api/a2a/pricing"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# MCP (Model Context Protocol) server (cmd/mcp, ADR 0009): a READ-ONLY inbound
+# adapter over the same query use cases as the REST GET routes and the A2A
+# skills. Tools: get_item_price and get_price_quote (both authority L1), plus one
+# resource and one prompt; Streamable HTTP only, stateless, no auth (fleet
+# decision). Off by default; warehouse-infra turns it on. A separate Deployment
+# + Service (<release>-mcp) in the same image (command /app/mcp). It needs
+# Postgres only: it renders no Kafka, outbox or consumer variable, and only the
+# api Deployment runs the outbox relay.
+mcp:
+  enabled: false
+  replicaCount: 1
+  # MCP_ADDR the binary listens on; keep in sync with service.targetPort.
+  # (8080 is the api, 8093 the a2a agent.)
+  httpAddr: ":8090"
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+  # Gateway exposure of the MCP server (mcp-route.yaml): host path
+  # /api/mcp/<context> rewritten to /mcp (the SDK's canonical endpoint on
+  # cmd/mcp). Off by default; warehouse-infra turns it on with the real
+  # parentRefs and path.
+  route:
+    enabled: false
+    path: "/api/mcp/pricing"
     parentRefs:
       - name: ""
         namespace: ""

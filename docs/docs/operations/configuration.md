@@ -2,21 +2,22 @@
 id: configuration
 title: Configuration
 sidebar_label: Configuration
-description: "Every environment variable read by the pricing binaries cmd/api and cmd/a2a: default, required or not, meaning."
+description: "Every environment variable read by the pricing binaries cmd/api, cmd/a2a and cmd/mcp: default, required or not, meaning."
 ---
 
 # Configuration
 
-Pricing ships two binaries (`cmd/api` and `cmd/a2a`). Both are configured
-only through environment variables and both refuse to boot, naming the
+Pricing ships three binaries (`cmd/api`, `cmd/a2a` and `cmd/mcp`). All are configured
+only through environment variables and all refuse to boot, naming the
 variable, when a mandatory one is missing. There is no in-memory mode, no
-`*_MODE` switch and no file-based configuration. The Helm chart
+`*_MODE` switch, no auth variable and no file-based configuration. The Helm chart
 (`charts/pricing`) renders each variable from a `values.yaml` key; see the
 [runbook](/docs/operations/runbook) for the chart side.
 
 Source: `cmd/api/config.go`, `cmd/api/main.go`, `cmd/api/policies.go`,
 `cmd/api/telemetry.go`, `cmd/a2a/config.go`, `cmd/a2a/main.go`,
-`cmd/a2a/telemetry.go`, `internal/adapters/outbound/telemetry/telemetry.go`.
+`cmd/a2a/telemetry.go`, `cmd/mcp/config.go`, `cmd/mcp/main.go`,
+`cmd/mcp/telemetry.go`, `internal/adapters/outbound/telemetry/telemetry.go`.
 
 ## `cmd/api` (REST, outbox relay, consumer, policy loop)
 
@@ -55,13 +56,31 @@ variables.
 | `SERVICE_VERSION` | `dev` | no | `service.version` and the version on the Agent Card. |
 | `ENVIRONMENT` | `local` | no | `deployment.environment.name` resource attribute. |
 
+## `cmd/mcp` (read-only MCP server)
+
+The server has no Kafka, outbox or consumer, so it reads none of those
+variables, and no auth variable (MCP is unauthenticated fleet-wide).
+
+| Variable | Default | Required? | Meaning |
+| --- | --- | --- | --- |
+| `MCP_ADDR` | `:8090` | no | Listen address of the Streamable HTTP server (`/mcp`, `/` and `/healthz`). Its port must equal the chart's `mcp.service.targetPort`. |
+| `DATABASE_URL` | none | **yes** | Postgres DSN of the same database the api uses. Boot error `DATABASE_URL is required` when empty. |
+| `MIGRATIONS_DATABASE_URL` | value of `DATABASE_URL` | no | Direct DSN for the boot migrations (the server runs the same embedded, idempotent migrations). |
+| `LOG_LEVEL` | `info` | no | Same values as the api. |
+| `OTEL_SERVICE_NAME` | `pricing-mcp` | no | `service.name` of spans and metrics. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | no | Collector OTLP/gRPC endpoint. |
+| `SERVICE_VERSION` | `dev` | no | `service.version` resource attribute, also logged on the `mcp server starting` line. |
+| `ENVIRONMENT` | `local` | no | `deployment.environment.name` resource attribute, also logged on the `mcp server starting` line. |
+
 ## Validation order and boot errors
 
 `cmd/api` validates in `loadRuntime` before anything is opened or bound:
 `DATABASE_URL`, then `KAFKA_BROKERS`, then `PRICING_CURRENCY` (if set), then
 each consumer group variable. The first failure is returned (exit code 1,
 message logged as `service exited with error`). `cmd/a2a` joins every problem
-(`DATABASE_URL`, `A2A_AGENT_URL`) into one `invalid configuration:` error.
+(`DATABASE_URL`, `A2A_AGENT_URL`) into one `invalid configuration:` error, and
+`cmd/mcp` returns `invalid configuration: DATABASE_URL is required...` before
+telemetry, any connection or the listener.
 
 Unparsable tuning values (`POLICY_INTERVAL`, `OUTBOX_RELAY_INTERVAL`,
 `OUTBOX_MAX_ATTEMPTS`, `SHUTDOWN_DRAIN_DELAY`) never abort boot: they log a
@@ -84,11 +103,12 @@ remove the relay's attempt cap.
 | `MIGRATIONS_DATABASE_URL` | `database.migrationsExistingSecretKey` / `database.migrationsUrl` |
 | `KAFKA_BROKERS` | `kafka.brokers` (required) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `otel.endpoint` (rendered only when `otel.enabled`) |
-| `OTEL_SERVICE_NAME` | `otel.serviceName` (a2a gets `<serviceName>-a2a`) |
+| `OTEL_SERVICE_NAME` | `otel.serviceName` (a2a gets `<serviceName>-a2a`, mcp gets `<serviceName>-mcp`) |
 | `ENVIRONMENT` | `environment` (chart default `production`) |
 | `SERVICE_VERSION` | image tag, or `appVersion` when empty |
 | `A2A_ADDR` | `a2a.httpAddr` |
 | `A2A_AGENT_URL` | `a2a.agentUrl` |
+| `MCP_ADDR` | `mcp.httpAddr` (its port must equal `mcp.service.targetPort`) |
 
 The chart refuses any `*_MODE` variable and any `*_CONSUMER_GROUP` in
 `extraEnv`, and refuses a `terminationGracePeriodSeconds` that does not exceed

@@ -16,13 +16,15 @@ service tier, a synthetic tax table, and the binding, immutable, expiring
 units in one configured currency.
 
 :::info What runs on develop
-One image, two binaries. `cmd/api` serves the REST API on `:8080` and runs, in
+One image, three binaries. `cmd/api` serves the REST API on `:8080` and runs, in
 the same process, the transactional outbox relay, the offer-availability
 consumer and the clock-driven policy loop. `cmd/a2a` is an optional read-only
-A2A agent on `:8093`. Both run on real Postgres only, and `cmd/api` also on
+A2A agent on `:8093` and `cmd/mcp` an optional read-only MCP server on `:8090`
+(chart value `mcp.enabled`, default off; warehouse-infra has not enabled it
+yet). The two read-only binaries run on real Postgres only, and `cmd/api` also on
 real Kafka only: there is no in-memory mode. `warehouse-infra` deploys the chart
 (`helm-values/pricing.yaml`) with the A2A agent enabled and the currency set to
-`USD`. There is no MCP binary.
+`USD`.
 :::
 
 ## What the context owns
