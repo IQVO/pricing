@@ -2,7 +2,7 @@
 id: observability
 title: Observability
 sidebar_label: Observability
-description: "Metrics, traces, log fields, exporter variables, dashboards and alerts for Pricing's two binaries."
+description: "Metrics, traces, log fields, exporter variables, dashboards and alerts for Pricing's three binaries."
 ---
 
 # Observability
@@ -17,16 +17,16 @@ nothing else (exporter failures are logged at DEBUG as `opentelemetry error`).
 
 Source: `internal/adapters/outbound/telemetry/` (`telemetry.go`,
 `quote_metrics.go`, `slogotel.go`), `cmd/api/telemetry.go`,
-`cmd/a2a/telemetry.go`, `internal/adapters/inbound/requestlog/requestlog.go`.
+`cmd/a2a/telemetry.go`, `cmd/mcp/telemetry.go`, `internal/adapters/inbound/requestlog/requestlog.go`.
 
 ## Exporter configuration
 
-| Variable | `cmd/api` default | `cmd/a2a` default | Meaning |
-| --- | --- | --- | --- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | `localhost:4317` | Collector OTLP/gRPC endpoint, `host:port` or URL; a bare `host:port` is turned into `http://host:port` |
-| `OTEL_SERVICE_NAME` | `pricing` | `pricing-a2a` | `service.name` of spans, metrics and the Loki `app` label source |
-| `SERVICE_VERSION` | `dev` | `dev` | `service.version` |
-| `ENVIRONMENT` | `local` | `local` | `deployment.environment.name` |
+| Variable | `cmd/api` default | `cmd/a2a` default | `cmd/mcp` default | Meaning |
+| --- | --- | --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | `localhost:4317` | `localhost:4317` | Collector OTLP/gRPC endpoint, `host:port` or URL; a bare `host:port` is turned into `http://host:port` |
+| `OTEL_SERVICE_NAME` | `pricing` | `pricing-a2a` | `pricing-mcp` | `service.name` of spans, metrics and the Loki `app` label source |
+| `SERVICE_VERSION` | `dev` | `dev` | `dev` | `service.version` |
+| `ENVIRONMENT` | `local` | `local` | `local` | `deployment.environment.name` |
 
 Traces are batched; metrics are pushed every 15 seconds by a periodic reader.
 Propagation is W3C `tracecontext` plus `baggage`. The chart renders the OTLP
@@ -38,7 +38,7 @@ variables only when `otel.enabled` is true (default), with endpoint
 | Name | Type | Unit | Attributes | Emitted by |
 | --- | --- | --- | --- | --- |
 | `pricing.quotes.issued` | Int64 counter | `{quote}` | `outcome` = `issued` \| `rejected`; `reason` (only when rejected) = the problem slug, for example `item-not-priced`, `no-charge-schedule`, `no-tax-table`, `empty-quote`, `internal-error` | `IssuePriceQuote` (`internal/application/usecases/quote_metrics.go`), once per attempt; only `cmd/api` |
-| `http.server.request.duration` | histogram (via `otelchimetric`) | `s` | route pattern, method (as exported by `riandyrn/otelchi/metric`) | both binaries, every non-probe HTTP request |
+| `http.server.request.duration` | histogram (via `otelchimetric`) | `s` | route pattern, method (as exported by `riandyrn/otelchi/metric`) | all three binaries, every non-probe HTTP request |
 | `go.*` / runtime metrics | various | various | | OTel Go runtime instrumentation, started in `telemetry.Setup` |
 
 `pricing.quotes.issued` is exposed to Prometheus as
@@ -57,7 +57,7 @@ counter: those signals are log lines and SQL queries only (see
 
 | Span | Kind | Created by | Notes |
 | --- | --- | --- | --- |
-| server span per request | server | `otelchi.Middleware` in both routers | Named after the chi route pattern (for example `/item-prices/{catalogItemId}`, via `WithChiRoutes`), so one name per route and not per item id |
+| server span per request | server | `otelchi.Middleware` in all three routers | Named after the chi route pattern (for example `/item-prices/{catalogItemId}`, via `WithChiRoutes`), so one name per route and not per item id |
 | `<topic> process` | consumer | `Consumer.handleTraced` (`internal/adapters/inbound/kafka/tracing.go`) | Parented to the producer's `traceparent` header when the message carries one, else a new trace. Attributes `messaging.system=kafka`, `messaging.destination.name`, `messaging.operation.name=process`. A returned error is recorded and sets the span status |
 | `a2a.skill <skill>` | internal | `answer` in `internal/adapters/inbound/a2a/skills.go` | Attribute `a2a.skill`; status `Error` when the skill answers a problem |
 
@@ -74,7 +74,7 @@ Logs are JSON from `log/slog` on stdout; `LOG_LEVEL` sets the level. A record
 written with a span-carrying context (the `*Context` slog variants) also carries
 `trace_id` and `span_id` (`telemetry.WithTraceContext`).
 
-Access log (`requestlog.RequestLogger`, `cmd/api` only), message `http request`:
+Access log (`requestlog.RequestLogger`, `cmd/api` and `cmd/mcp`), message `http request`:
 
 | Field | Meaning |
 | --- | --- |
@@ -115,6 +115,9 @@ not-ready; waiting for traffic to drain`. Warnings and errors worth alerting on:
 | `invalid OUTBOX_RELAY_INTERVAL; using the default` and the sibling `POLICY_INTERVAL`, `OUTBOX_MAX_ATTEMPTS`, `SHUTDOWN_DRAIN_DELAY` messages | WARN | A malformed tuning value |
 | `telemetry flush failed on shutdown` | WARN | The final export (bounded to 5 s) failed |
 | `a2a skill failed` | ERROR | A skill hit an unexpected error; the answer is a generic 500 problem |
+| `mcp tool failed with an unexpected error` | ERROR | A tool hit an unexpected error; the answer is the generic `internal-error: an unexpected internal error occurred` tool error (`cmd/mcp`) |
+
+`cmd/mcp` also logs `mcp server starting` (`version`, `environment`), `postgres read side configured` and `mcp server listening (Streamable HTTP)` (`addr`) at boot, and `mcp server exited with error` (exit 1) on a boot failure.
 
 `<consumer>` is `offer-availability`.
 

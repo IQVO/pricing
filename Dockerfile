@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # --- build stage ---
-FROM golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS build
+FROM golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523 AS build
 WORKDIR /src
 
 # Cache go.mod/go.sum download separately from source so editing source
@@ -40,8 +40,10 @@ WORKDIR /app
 # filesystem read-only. Logs go to stdout.
 COPY --from=build --chown=app:app /out/ ./
 USER 1000
-EXPOSE 8080 8093
+EXPOSE 8080 8090 8093
 # cmd/api is the service's main binary (HTTP on :8080). Additional cmd/*
-# binaries are run by the chart with `command: ["/app/<dirname>"]`: cmd/a2a is
-# the read-only A2A agent (JSON-RPC on :8093, ADR 0007).
+# binaries are run by the chart with `command: ["/app/<dirname>"]`: cmd/mcp is
+# the read-only MCP server (Streamable HTTP on :8090, ADR 0009) and cmd/a2a the
+# read-only A2A agent (JSON-RPC on :8093, ADR 0007). The build loop above
+# compiles every cmd/* directory, so /app/mcp ships in this same image.
 ENTRYPOINT ["./api"]

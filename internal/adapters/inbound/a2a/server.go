@@ -89,7 +89,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillItemPrice,
 				Name:        "Current price of a catalogue item",
 				Description: "Read of one item price by catalogItemId: its state (ACTIVE or WITHDRAWN), list price, the effective price at this instant (the running sale price, else the list price), every sale window with its saleId, price and from/to instants, and the version. Amounts are minor units of the stated currency. Answers a 404 problem when the item has no price.",
-				Tags:        []string{agentName, "item-price", "read"},
+				Tags:        []string{agentName, "item-price", "read", "authority:L1"},
 				InputModes:  []string{contentTypeJSON},
 				Examples: []string{
 					`{"skill":"item_price","arguments":{"catalogItemId":"sku-1"}}`,
@@ -99,7 +99,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillQuoteStatus,
 				Name:        "Status and breakdown of an issued price quote",
 				Description: "Read of one price quote by quoteId: ISSUED or EXPIRED at this instant (a quote past its expiresAt is EXPIRED whether or not the policy stored it yet), the cart it priced, its lines (unit price and line total), the delivery charge per shipment group, tax, total, the price/schedule/tax-table versions it used, and issuedAt/expiresAt. Amounts are minor units of the quote currency. Answers a 404 problem for an unknown quote. It never issues a quote.",
-				Tags:        []string{agentName, "price-quote", "read"},
+				Tags:        []string{agentName, "price-quote", "read", "authority:L1"},
 				InputModes:  []string{contentTypeJSON},
 				Examples: []string{
 					`{"skill":"quote_status","arguments":{"quoteId":"quote-1"}}`,

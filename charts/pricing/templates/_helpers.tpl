@@ -58,6 +58,13 @@ Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 000
 {{- end }}
 
 {{/*
+Fully qualified name of the MCP server Deployment/Service (<release>-mcp, ADR 0009).
+*/}}
+{{- define "pricing.mcpFullname" -}}
+{{- include "pricing.fullname" . }}-mcp
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "pricing.serviceAccountName" -}}
@@ -192,6 +199,17 @@ target (cmd/a2a listens on A2A_ADDR).
 {{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.a2a.httpAddr)) -}}
 {{- if ne $port (toString .Values.a2a.service.targetPort) -}}
 {{- fail (printf "a2a.httpAddr is %q but a2a.service.targetPort is %v: the container port, the probes and the Service must agree." .Values.a2a.httpAddr .Values.a2a.service.targetPort) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The port of mcp.httpAddr is the container port the probes and the MCP Service
+target (cmd/mcp listens on MCP_ADDR).
+*/}}
+{{- define "pricing.requireMCPHttpPort" -}}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.mcp.httpAddr)) -}}
+{{- if ne $port (toString .Values.mcp.service.targetPort) -}}
+{{- fail (printf "mcp.httpAddr is %q but mcp.service.targetPort is %v: the container port, the probes and the Service must agree." .Values.mcp.httpAddr .Values.mcp.service.targetPort) -}}
 {{- end -}}
 {{- end -}}
 

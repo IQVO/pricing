@@ -149,7 +149,7 @@ type string**, never on a suffix. Consumer group names come from mandatory envir
 
 | Event | Full type | Fields used | What this context does |
 | --- | --- | --- | --- |
-| `CatalogItemCreated` | `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated` | `catalogItemId` | Adds the item to `CatalogItemView` as known and not discontinued, so `SetListPrice` and `ScheduleSale` can pass `ErrUnknownCatalogItem`. |
+| `CatalogItemCreated` | `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated` | `catalogItemId` | Adds the item to `CatalogItemView` as known and not discontinued, so `CreateItemPrice`, `SetListPrice` and `ScheduleSale` can pass `ErrUnknownCatalogItem`. |
 | `CatalogItemDiscontinued` | `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued` | `catalogItemId` | Marks the item discontinued in `CatalogItemView` and runs `WithdrawOnDiscontinue`: `WithdrawPrice`, publishing `ItemPriceWithdrawn`. |
 
 **Ordering.** The producer keys by `catalogItemId`, and pricing's view and

@@ -58,6 +58,9 @@ func TestCardSkillsAreCuratedAndTruthful(t *testing.T) {
 		if !containsTag(s.Tags, "read") || containsTag(s.Tags, "write") {
 			t.Errorf("skill %q must be tagged read and never write (this agent is read-only), tags = %v", s.ID, s.Tags)
 		}
+		if !containsTag(s.Tags, "authority:L1") {
+			t.Errorf("skill %q must declare authority:L1 (a pure read, ADR 0009), tags = %v", s.ID, s.Tags)
+		}
 		for _, ex := range s.Examples {
 			var req skillRequest
 			if err := decodeStrict([]byte(ex), &req); err != nil {
