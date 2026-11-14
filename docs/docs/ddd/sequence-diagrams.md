@@ -23,14 +23,14 @@ packages and ports of the code, from the
 Every save is conditional on the loaded `version` (optimistic concurrency).
 Full CloudEvents types are on [Domain Events](/docs/ddd/domain-events).
 
-## 1. CreateItemPrice and SetListPrice (REST POST /item-prices and PUT .../list-price)
+## 1. CreateItemPrice (REST POST /item-prices)
 
 ```mermaid
 %%{init: {"sequence": {"wrap": true, "width": 120, "actorMargin": 24, "messageMargin": 28, "boxMargin": 6, "noteMargin": 6, "mirrorActors": false}}}%%
 sequenceDiagram
     autonumber
     participant H as http
-    participant UC as SetListPrice
+    participant UC as CreateItemPrice
     participant CV as CatalogView
     participant A as ItemPrice
     participant DB as Postgres
@@ -46,13 +46,13 @@ sequenceDiagram
             CV-->>UC: miss
             UC-->>H: 422 unknown-catalog-item<br/>ErrUnknownCatalogItem
         else known
-            UC->>A: Create or SetListPrice(price, inputs)
+            UC->>A: Create(price, inputs)
             alt ErrNegativeAmount or ErrCurrencyMismatch
                 A-->>UC: error
                 UC-->>H: 422 problem
             else valid
                 A-->>UC: ACTIVE + ItemPriceChanged
-                UC->>DB: BEGIN, insert or update where version matches
+                UC->>DB: BEGIN, insert the item price
                 UC->>DB: insert outbox ItemPriceChanged
                 UC->>DB: store key response, COMMIT
                 UC-->>H: 201 version
@@ -64,9 +64,11 @@ sequenceDiagram
     end
 ```
 
-Source: `internal/application/usecases/itemprice.go` (`CreateItemPrice`, `SetListPrice`), `internal/adapters/inbound/http/{handlers,idempotency}.go`.
-The key lookup applies to `POST /item-prices`; `PUT .../list-price` is idempotent
-by method and skips it. Where the diagram says "store key response, COMMIT" the key
+Source: `internal/application/usecases/itemprice.go` (`CreateItemPrice`), `internal/adapters/inbound/http/{handlers,idempotency}.go`.
+`SetListPrice` (`PUT /item-prices/{catalogItemId}/list-price`) is not drawn: it is idempotent
+by method, so it skips the key lookup; it loads the stored price, checks the optional `version`
+and calls `ItemPrice.SetListPrice` on it instead of `Create`, and answers `200`
+(`usecases/itemprice.go`, `apis/openapi.yaml` `setListPrice`). Where the diagram says "store key response, COMMIT" the key
 row, the aggregate change and the outbox rows are one transaction, and a key reused
 with another request is `409 idempotency-key-reused`.
 

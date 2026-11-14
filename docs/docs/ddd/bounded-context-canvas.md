@@ -46,7 +46,7 @@ flowchart LR
         direction TB
         card["<b>Purpose</b><br/>Own what a shopper pays: list<br/>prices and sale windows, the<br/>delivery charge per tier, a<br/>synthetic tax table, and the<br/>binding, expiring PriceQuote.<br/><br/><b>Domain roles</b><br/>- Specification (price of an item,<br/>charge of a tier)<br/>- Execution (price quotes)<br/><br/><b>Business decisions it enforces</b><br/>- Sale below list; sale windows<br/>of one item never overlap<br/>- One current charge schedule and<br/>tax table; versions supersede<br/>- A PriceQuote is binding,<br/>immutable and expiring<br/>- Item master stays in<br/>offer-availability"]:::card
     end
-    in0 -->|"cmd - REST<br/>SetListPrice, ScheduleSale,<br/>CancelSale, WithdrawPrice,<br/>PublishChargeSchedule,<br/>PublishTaxTable"| BC
+    in0 -->|"cmd - REST<br/>CreateItemPrice, SetListPrice,<br/>ScheduleSale, CancelSale, WithdrawPrice,<br/>PublishChargeSchedule,<br/>PublishTaxTable"| BC
     in0 -.->|"qry - REST<br/>GetItemPrice,<br/>GetCurrentChargeSchedule,<br/>GetCurrentTaxTable"| BC
     in2 -->|"cmd - REST<br/>IssuePriceQuote"| BC
     in2 -.->|"qry - REST<br/>GetPriceQuote"| BC
@@ -136,7 +136,8 @@ To own what a shopper pays. The context:
 
 | Collaborator | Message | Type | Channel | Relationship |
 | --- | --- | --- | --- | --- |
-| Storefront merchandiser (human) | `SetListPrice` | Command | REST `POST /item-prices`, `PUT /item-prices/{catalogItemId}/list-price` | UI |
+| Storefront merchandiser (human) | `CreateItemPrice` | Command | REST `POST /item-prices` | UI |
+| Storefront merchandiser (human) | `SetListPrice` | Command | REST `PUT /item-prices/{catalogItemId}/list-price` | UI |
 | Storefront merchandiser (human) | `ScheduleSale`, `CancelSale` | Command | REST `POST /item-prices/{catalogItemId}/sales`, `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | UI |
 | Storefront merchandiser (human) | `WithdrawPrice` | Command | REST `POST /item-prices/{catalogItemId}/withdrawals` | UI |
 | Storefront merchandiser (human) | `PublishChargeSchedule` | Command | REST `POST /delivery-charge-schedules` | UI |
@@ -202,7 +203,7 @@ Top terms: **List Price**, **Sale Window**, **Effective Price**,
 ## Assumptions
 
 - `offer-availability` publishes `CatalogItemCreated` before pricing can be
-  asked to price the item; an earlier `SetListPrice` fails
+  asked to price the item; an earlier `CreateItemPrice` fails
   `ErrUnknownCatalogItem` and the merchandiser retries.
 - The merchandiser's UI and the consumers tolerate the outbox lag between a
   price decision and `ItemPriceChanged`; sale boundaries are published by
