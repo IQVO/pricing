@@ -28,7 +28,7 @@ sequenceDiagram
     participant K as Kafka
     participant PD as product-discovery
     participant SC as shopping-cart
-    M->>PR: cmd: SetListPrice<br/>POST /item-prices
+    M->>PR: cmd: CreateItemPrice<br/>POST /item-prices
     Note over PR: ErrUnknownCatalogItem<br/>against CatalogItemView
     PR->>K: evt: itemprice.<br/>ItemPriceChanged
     PR-->>M: cmd: reply 201<br/>version

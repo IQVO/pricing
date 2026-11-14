@@ -33,7 +33,8 @@ page width.
 ```mermaid
 flowchart LR
     M["Storefront<br/>merchandiser"]:::actor
-    C0["SetListPrice<br/>POST /item-prices"]:::command
+    C0["CreateItemPrice<br/>POST /item-prices"]:::command
+    C4["SetListPrice<br/>PUT .../item-prices/catalogItemId/list-price"]:::command
     C1["ScheduleSale<br/>POST .../sales"]:::command
     C2["CancelSale<br/>POST .../sales/saleId/cancellations"]:::command
     C3["WithdrawPrice<br/>POST .../item-prices/catalogItemId/withdrawals"]:::command
@@ -45,12 +46,14 @@ flowchart LR
     SC["shopping-cart"]:::external
 
     M --> C0
+    M --> C4
     M --> C1
     M --> C2
     M --> C3
     C0 --> RM0
     RM0 -->|known, not discontinued| G1
     C0 --> G1
+    C4 --> G1
     C1 --> G1
     C2 --> G1
     C3 --> G1
@@ -191,7 +194,7 @@ flowchart LR
     E2["ItemPriceWithdrawn"]:::event
     PD["product-discovery"]:::external
     SC["shopping-cart"]:::external
-    H6["H6 create lags:<br/>SetListPrice too early"]:::hotspot
+    H6["H6 create lags:<br/>CreateItemPrice too early"]:::hotspot
 
     OA --> E4
     OA --> E5
@@ -234,4 +237,4 @@ order per item.
 | H3 | **Resolved in the model-fix:** no `PriceQuoteExpired` event. Quotes are checkout-internal TTL state and expiry is checkout's clock (`ExpireOnQuoteExpiry`), not a business fact anyone consumes. The `ISSUED → EXPIRED` transition stays. | `aggregates[PriceQuote].notes` |
 | H4 | **Resolved in the model-fix:** the `IssuePriceQuote` inbound row now lists its fields: `cartId`, `lines[catalogItemId, quantity]`, `groups[groupNo, offerId, tier, lineNos]`, `destinationPostalPrefix`. The caller is checkout and the quote prices exactly what the checkout session froze. | `contexts[pricing].inbound` (checkout cmd row) |
 | H5 | A price can move between the cart's non-binding estimate and checkout. Resolved by design: the binding `PriceQuote` pins versions and the review page shows the binding total; tracked as gap S2. | `business_decisions` (PriceQuote bullet); [Model Gap Register](https://iqvo.github.io/warehouse-docs/storefront/strategic-design/model-gap-register) S2 |
-| H6 | `SetListPrice` before `CatalogItemCreated` is consumed fails `ErrUnknownCatalogItem`; the merchandiser retries. The model names no pending state for "item announced, not yet visible". | `aggregates[ItemPrice].invariants`, `.read_models[CatalogItemView]` |
+| H6 | `CreateItemPrice` before `CatalogItemCreated` is consumed fails `ErrUnknownCatalogItem`; the merchandiser retries. The model names no pending state for "item announced, not yet visible". | `aggregates[ItemPrice].invariants`, `.read_models[CatalogItemView]` |

@@ -32,7 +32,7 @@ price is the lowest active sale price, else the list price. Value objects:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ACTIVE: SetListPrice
+    [*] --> ACTIVE: CreateItemPrice
     ACTIVE --> ACTIVE: ScheduleSale / CancelSale
     ACTIVE --> WITHDRAWN: WithdrawPrice
     WITHDRAWN --> [*]
@@ -47,8 +47,12 @@ Source: `internal/domain/itemprice/itemprice.go` (states and transitions).
 Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice].states`,
 `.transitions`, `.commands`, `.policies`.
 
-The entry arrow `[*] --> ACTIVE` is the creating command `SetListPrice`;
-the model lists transitions between states only, so the creation and the
+The entry arrow `[*] --> ACTIVE` is the creating command `CreateItemPrice`
+(`POST /item-prices`; the code comment in `internal/application/usecases/itemprice.go`
+calls it `SetListPrice` on an item without a price). `SetListPrice`
+(`PUT /item-prices/{catalogItemId}/list-price`) needs an `ACTIVE` price
+(`ItemPrice.SetListPrice` in `internal/domain/itemprice/itemprice.go`). The model
+lists transitions between states only, so the creation and the
 self-transition for sale management are this page's reading. The model
 names no transition out of `WITHDRAWN`: a withdrawn price is not revived;
 selling the item again needs a new price decision (open question on the
@@ -62,7 +66,7 @@ selling the item again needs a new price decision (open question on the
 | All prices of an item use the configured currency | all commands → `ErrCurrencyMismatch` |
 | A sale price is below the list price | `ScheduleSale` → `ErrSaleNotBelowList` |
 | Sale windows of one item never overlap | `ScheduleSale` → `ErrOverlappingSaleWindow` |
-| The item exists in the local `CatalogItemView` and is not `DISCONTINUED` | `SetListPrice`, `ScheduleSale` → `ErrUnknownCatalogItem` |
+| The item exists in the local `CatalogItemView` and is not `DISCONTINUED` | `CreateItemPrice`, `SetListPrice`, `ScheduleSale` → `ErrUnknownCatalogItem` |
 | A `WITHDRAWN` price takes no further command, and is never revived | every command → `ErrIllegalTransition` (409 `illegal-transition`) |
 | At most 50 live sale windows | `ScheduleSale` → `ErrValidation` (422 `validation-failed`) |
 
@@ -80,7 +84,8 @@ Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice].invariants
 
 | Command | Trigger | Transition |
 | --- | --- | --- |
-| `SetListPrice` | Merchandiser, REST `POST /item-prices` / `PUT /item-prices/{catalogItemId}/list-price` | `[*] → ACTIVE`, then list-price updates in `ACTIVE` |
+| `CreateItemPrice` | Merchandiser, REST `POST /item-prices` | `[*] → ACTIVE` |
+| `SetListPrice` | Merchandiser, REST `PUT /item-prices/{catalogItemId}/list-price` | list-price update in `ACTIVE`; on a `WITHDRAWN` price `ErrIllegalTransition` |
 | `ScheduleSale` | Merchandiser, REST `POST /item-prices/{catalogItemId}/sales` | none (adds a window) |
 | `CancelSale` | Merchandiser, REST `POST /item-prices/{catalogItemId}/sales/{saleId}/cancellations` | none (removes a window); raises `ItemPriceChanged` when the effective price reverts |
 | `WithdrawPrice` | Merchandiser, REST `POST /item-prices/{catalogItemId}/withdrawals`, or `WithdrawOnDiscontinue` on Kafka `CatalogItemDiscontinued` | `ACTIVE → WITHDRAWN`; on a `WITHDRAWN` price `ErrIllegalTransition` |
@@ -89,7 +94,7 @@ Derived from: `model.yaml → contexts[pricing].aggregates[ItemPrice].invariants
 
 | Event | Raised when | Full CloudEvents type |
 | --- | --- | --- |
-| `ItemPriceChanged` | `SetListPrice` (create or update), `ScheduleSale` of an open window and `CancelSale` of the live sale are saved, and on a sale window boundary (`PublishEffectivePriceOnWindowBoundary`), each time only when the published view (list price, effective price, sale end) moved | `com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged` |
+| `ItemPriceChanged` | `CreateItemPrice` and `SetListPrice`, `ScheduleSale` of an open window and `CancelSale` of the live sale are saved, and on a sale window boundary (`PublishEffectivePriceOnWindowBoundary`), each time only when the published view (list price, effective price, sale end) moved | `com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged` |
 | `ItemPriceWithdrawn` | `WithdrawPrice` is saved | `com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn` |
 
 `CancelSale` raises `ItemPriceChanged` (the effective price reverts to the
@@ -337,7 +342,7 @@ explainable.
 
 | Read model | Source events | Serves | Why it is not an aggregate |
 | --- | --- | --- | --- |
-| `CatalogItemView` | `offer-availability` `CatalogItemCreated`, `CatalogItemDiscontinued` | `ErrUnknownCatalogItem` enforcement inside `SetListPrice` / `ScheduleSale` | It protects no invariant of its own and takes no command; it is a projection of facts `offer-availability` owns, rebuildable by replaying the topic. |
+| `CatalogItemView` | `offer-availability` `CatalogItemCreated`, `CatalogItemDiscontinued` | `ErrUnknownCatalogItem` enforcement inside `CreateItemPrice`, `SetListPrice` and `ScheduleSale` | It protects no invariant of its own and takes no command; it is a projection of facts `offer-availability` owns, rebuildable by replaying the topic. |
 
 Derived from: `model.yaml → contexts[pricing].read_models`. The view keeps
 exactly what the invariant needs: that the item exists and whether it is
