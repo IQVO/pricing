@@ -25,12 +25,29 @@ available before it. `make help` lists them all.
 
 ### Godog features
 
-Five feature files, 26 scenarios: `item_price.feature` (6), `sales.feature` (5),
-`price_quote.feature` (5), `policies.feature` (5) and
-`api_idempotency.feature` (5). The runner is `TestFeatures` in
-`internal/bdd/features_test.go` (steps in `steps_given_test.go`,
-`steps_when_test.go`, `steps_then_test.go`); there are no Go files at the
-repository root.
+15 feature files, 127 `Scenario` and `Scenario Outline` definitions; with the
+`Examples` rows expanded the runner reports `170 scenarios (170 passed)`
+(`go test ./internal/bdd -run TestFeatures -count=1 -v`).
+
+| Files | Definitions | Executed |
+| --- | --- | --- |
+| the six acceptance files: `item_price` (6), `sales` (5), `price_quote` (5), `policies` (5), `api_idempotency` (7), `reads_and_tax` (4) | 32 | 32 |
+| `item_price_rules` | 15 | 16 |
+| `sale_window_rules` | 14 | 21 |
+| `catalogue_feed_rules` | 7 | 7 |
+| `charge_schedule_rules` | 9 | 14 |
+| `tax_table_rules` | 10 | 15 |
+| `quote_pricing_rules` | 17 | 38 |
+| `quote_lifecycle_rules` | 8 | 8 |
+| `api_contract_rules` | 12 | 16 |
+| `readiness_rules` | 3 | 3 |
+
+The nine `*_rules.feature` files pin the rules of the Pricing documentation and
+of ADR 0002 and the troubleshooting page (boundaries, caps, state edges, the
+clock-driven policies, the REST write rules and readiness). The runner is
+`TestFeatures` in `internal/bdd/features_test.go` (steps in `steps_given_test.go`,
+`steps_when_test.go`, `steps_then_test.go`, `steps_wave2_test.go`,
+`steps_rules_test.go`); there are no Go files at the repository root.
 
 ### Contract tests
 
