@@ -277,3 +277,13 @@ func TestRestoreRefusesCorruptSnapshots(t *testing.T) {
 		t.Error("State.Valid() is wrong")
 	}
 }
+
+func TestRestoreAcceptsTheLowestVersion(t *testing.T) {
+	r, err := schedule.Restore(mustPublish(t, 1).Snapshot())
+	if err != nil {
+		t.Fatalf("Restore(version 1) = %v", err)
+	}
+	if r.Version() != 1 {
+		t.Errorf("Version() = %d, want 1", r.Version())
+	}
+}
