@@ -27,8 +27,15 @@ unleash:
     # differs. See HARNESS.md's mutation-testing section for the
     # tagless-switch-under-reports pitfall before assuming a low number
     # means missing tests.
-    # Measured 2026-10-25 per package: itemprice 95.35, quote 87.36, schedule 95.24,
-    # shared 100.00, tax 92.98 (mutator coverage 100 everywhere). One threshold
-    # serves every package, so it sits just below the lowest (quote).
-    efficacy: "85"
-    mutant-coverage: "95"
+    # Measured 2026-11-15 per package (gremlins v0.6.0, `make mutation`):
+    # itemprice 95.35 (41 killed, 2 lived), quote 100.00, schedule 100.00,
+    # shared 100.00, tax 96.49 (55 killed, 2 lived); mutator coverage 100 in
+    # every package. The 4 survivors are equivalent mutants listed in
+    # MUTATION.md, so the efficacy gate sits just below the lowest package
+    # (itemprice), not at the fleet's 99 (95.35 is the most this domain can
+    # honestly measure).
+    # Thresholds are plain numbers on purpose: gremlins v0.6.0 reads them with a
+    # float type assertion, so a quoted string ("95") is read as 0 and the gate
+    # never fails.
+    efficacy: 95
+    mutant-coverage: 99

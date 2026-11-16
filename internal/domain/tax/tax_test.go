@@ -2,6 +2,7 @@ package tax_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,5 +256,28 @@ func TestRestoreRefusesCorruptSnapshots(t *testing.T) {
 	}
 	if !tax.StateCurrent.Valid() || !tax.StateSuperseded.Valid() || tax.State("").Valid() {
 		t.Error("State.Valid() is wrong")
+	}
+}
+
+func TestRestoreAcceptsTheLowestVersion(t *testing.T) {
+	s := mustPublish(t, 1).Snapshot()
+	r, err := tax.Restore(s)
+	if err != nil {
+		t.Fatalf("Restore(version 1) = %v", err)
+	}
+	if r.Version() != 1 {
+		t.Errorf("Version() = %d, want 1", r.Version())
+	}
+}
+
+// Bands sharing a start keep the order they were given in, so the overlap
+// error names them predictably.
+func TestOverlapNamesBandsWithEqualStartsInTheOrderGiven(t *testing.T) {
+	_, _, err := tax.Publish("t", 1, []tax.TaxBand{band("100", "199", 1), band("100", "150", 1)}, 0, t0)
+	if !errors.Is(err, tax.ErrOverlappingTaxBand) {
+		t.Fatalf("Publish() = %v, want ErrOverlappingTaxBand", err)
+	}
+	if want := "100-199 and 100-150"; !strings.Contains(err.Error(), want) {
+		t.Errorf("Publish() = %q, want it to name %q", err, want)
 	}
 }

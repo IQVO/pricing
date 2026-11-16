@@ -95,9 +95,12 @@ registry golden, the surface (1 resource, 1 prompt) and stateless transport test
 ### Mutation testing
 
 `.gremlins.yaml` sets one worker, a timeout coefficient of 30, an efficacy
-threshold of 85 and a mutant-coverage threshold of 95. The thresholds sit just
-below the lowest measured package (quote, 87.36 on 2026-10-25; itemprice 95.35,
-schedule 95.24, shared 100.00, tax 92.98). `make mutation` loops gremlins over
+threshold of 95 and a mutant-coverage threshold of 99, written as plain numbers
+(a quoted threshold is read as 0 by gremlins v0.6.0 and never fails). The
+efficacy gate sits just below the lowest measured package (itemprice, 95.35 on
+2026-11-15; quote 100.00, schedule 100.00, shared 100.00, tax 96.49). The four
+surviving mutants are equivalent and listed in `MUTATION.md`.
+`make mutation` loops gremlins over
 every directory under `internal/domain/` (so a new domain package is gated as
 soon as it exists); `make mutation-full` runs `./internal/domain` in one go.
 
