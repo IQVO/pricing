@@ -122,6 +122,11 @@ const sidebars: SidebarsConfig = {
           label: '0009 A read-only MCP server with authority levels and a complete surface',
           href: '/docs/adr/0009-read-only-mcp-server',
         },
+        {
+          type: 'link',
+          label: '0010 Accept the CONSOLIDATED delivery tier as a free tier',
+          href: '/docs/adr/0010-accept-the-consolidated-tier-as-a-free-tier',
+        },
       ],
     },
   ],

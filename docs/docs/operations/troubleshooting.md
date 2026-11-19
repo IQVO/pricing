@@ -54,7 +54,7 @@ Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
 | 409 | `illegal-transition` | A command on a `WITHDRAWN` price (set list price, schedule or cancel a sale, withdraw again) | A withdrawn price is never revived (ADR 0002 A3) |
 | 422 | `unknown-catalog-item` | The item is unknown or `DISCONTINUED` in the local `catalog_items` view | Check the offer-availability consumer is running and the `CatalogItemCreated` event arrived |
 | 422 | `sale-not-below-list` | A sale price is not below the list price, or a new list price is not above an existing sale price | Lower the sale or raise the list price |
-| 422 | `incomplete-charge-schedule` | A schedule does not name a charge for every tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`) | Add the missing tier |
+| 422 | `incomplete-charge-schedule` | A schedule does not name a charge for every classic tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`); `CONSOLIDATED` is optional | Add the missing tier |
 | 422 | `overlapping-tax-band` | Tax bands overlap | Make the prefix ranges disjoint |
 | 422 | `rate-out-of-range` | `rateBasisPoints` outside 0 to 10000 | Fix the rate |
 | 422 | `item-not-priced` | A quote line names an item with no price or a `WITHDRAWN` one | Publish the price (`POST /item-prices`) |

@@ -93,7 +93,8 @@ the same transaction as the change, `internal/adapters/inbound/http/idempotency.
 
 - **Input:** `version`, `tiers[]` (`tier`, `charge`, optional `freeOver`).
 - **Invariants:** a charge for every tier of `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`,
-  `STANDARD` (`incomplete-charge-schedule`); amounts in the configured
+  `STANDARD` (`incomplete-charge-schedule`); an optional `CONSOLIDATED` row
+  (free when absent, ADR 0010); amounts in the configured
   currency; `version` above the current one (`non-increasing-version`, 409).
 - **Effect:** in one transaction the previous `CURRENT` schedule becomes
   `SUPERSEDED` and the new one `CURRENT`; a second `CURRENT` row is refused by a

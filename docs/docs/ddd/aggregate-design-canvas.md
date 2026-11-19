@@ -128,7 +128,9 @@ every event carries.
 ### 2. Description
 
 The delivery charge per service tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`,
-`STANDARD`), with an optional free-over threshold per tier. Exactly one
+`STANDARD`, and optionally `CONSOLIDATED`, which is free when the schedule
+declares no row for it, [ADR 0010](/docs/adr/0010-accept-the-consolidated-tier-as-a-free-tier)),
+with an optional free-over threshold per tier. Exactly one
 schedule is current; versions strictly increase.
 
 | Value object | Fields | Note |

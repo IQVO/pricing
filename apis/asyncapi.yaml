@@ -482,6 +482,7 @@ components:
           minimum: 1
         tiers:
           type: array
+          description: One row per classic tier; a CONSOLIDATED row is present only when the schedule declares one (absent means CONSOLIDATED is free).
           items:
             type: object
             required:
@@ -495,6 +496,7 @@ components:
                 - NEXT_DAY
                 - TWO_DAY
                 - STANDARD
+                - CONSOLIDATED
               chargeMinor:
                 type: integer
                 format: int64

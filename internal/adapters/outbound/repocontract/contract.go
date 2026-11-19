@@ -41,17 +41,18 @@ type Env struct {
 func Run(t *testing.T, newEnv func(t *testing.T) Env) {
 	t.Helper()
 	suites := map[string]func(*testing.T, Env){
-		"itemprices":  testItemPrices,
-		"listpages":   testListPages,
-		"boundaries":  testBoundaries,
-		"schedules":   testSchedules,
-		"taxtables":   testTaxTables,
-		"quotes":      testQuotes,
-		"expiry":      testQuoteExpiry,
-		"catalog":     testCatalog,
-		"inbox":       testInbox,
-		"unitofwork":  testUnitOfWork,
-		"idempotency": testIdempotency,
+		"itemprices":   testItemPrices,
+		"listpages":    testListPages,
+		"boundaries":   testBoundaries,
+		"schedules":    testSchedules,
+		"taxtables":    testTaxTables,
+		"quotes":       testQuotes,
+		"consolidated": testConsolidated,
+		"expiry":       testQuoteExpiry,
+		"catalog":      testCatalog,
+		"inbox":        testInbox,
+		"unitofwork":   testUnitOfWork,
+		"idempotency":  testIdempotency,
 	}
 	for name, fn := range suites {
 		t.Run(name, func(t *testing.T) { fn(t, newEnv(t)) })

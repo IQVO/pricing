@@ -139,9 +139,17 @@ func TestValidCurrency(t *testing.T) {
 }
 
 func TestTier(t *testing.T) {
-	for _, tier := range shared.Tiers() {
+	for _, tier := range append(shared.Tiers(), shared.TierConsolidated) {
 		if !tier.Valid() {
 			t.Errorf("%s must be valid", tier)
+		}
+	}
+	if string(shared.TierConsolidated) != "CONSOLIDATED" {
+		t.Errorf("TierConsolidated = %q", shared.TierConsolidated)
+	}
+	for _, classic := range shared.Tiers() {
+		if classic == shared.TierConsolidated {
+			t.Error("Tiers() lists the classic tiers a schedule must name; CONSOLIDATED is optional")
 		}
 	}
 	if len(shared.Tiers()) != 4 {
@@ -150,7 +158,7 @@ func TestTier(t *testing.T) {
 	if shared.Tiers()[0] != shared.TierSameDay || shared.Tiers()[3] != shared.TierStandard {
 		t.Errorf("Tiers() = %v, want speed order", shared.Tiers())
 	}
-	for _, bad := range []shared.Tier{"", "same_day", "WEEKLY"} {
+	for _, bad := range []shared.Tier{"", "same_day", "consolidated", "WEEKLY"} {
 		if bad.Valid() {
 			t.Errorf("%q must be invalid", bad)
 		}
