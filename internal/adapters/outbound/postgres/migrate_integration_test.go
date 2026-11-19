@@ -33,7 +33,7 @@ func TestMigrationsGoUpDownUp(t *testing.T) {
 		t.Fatalf("up: %v", err)
 	}
 	up := tableCount(t, url)
-	// 0001 creates the 13 tables of the pricing schema.
+	// 0001 creates the 13 tables of the pricing schema (0002 only widens two CHECKs).
 	if up != 13 {
 		t.Fatalf("after up: %d tables, want 13", up)
 	}

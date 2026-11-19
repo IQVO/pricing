@@ -109,7 +109,8 @@ To own what a shopper pays. The context:
 - keeps the list price and sale windows of every catalogue item, versioned,
   with the effective price derived (lowest active sale, else list);
 - prices each delivery service tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`,
-  `STANDARD`) with an optional free-over threshold;
+  `STANDARD`) with an optional free-over threshold; `CONSOLIDATED` is free
+  unless a schedule declares a row for it (ADR 0010);
 - holds the synthetic tax table by postal-prefix band;
 - issues the binding, immutable, expiring `PriceQuote` a checkout session
   is confirmed against, pinning the price, schedule and tax-table versions

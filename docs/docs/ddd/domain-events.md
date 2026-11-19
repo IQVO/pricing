@@ -90,7 +90,7 @@ analytics-only: by `conventions.integration_rules` it goes to the
 | `scheduleId` | string | The new current schedule. |
 | `version` | integer | Strictly increasing schedule version. |
 | `tiers[]` | array | One entry per service tier. |
-| `tiers[].tier` | enum | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY` or `STANDARD`. |
+| `tiers[].tier` | enum | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD` or `CONSOLIDATED` (a row only when the schedule declares it; absent means free). |
 | `tiers[].chargeMinor` | integer | The delivery charge for the tier, minor units. |
 | `tiers[].freeOverMinor` | integer, optional | Free-delivery threshold for the tier, minor units. |
 
