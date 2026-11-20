@@ -127,6 +127,11 @@ func TestANoTaxTableRefusalIsNotStoredSoItsKeyRetries(t *testing.T) {
 	if resp := r.svc.call(t, "POST", "/tax-tables", "k-tax-tt", taxBody(1)); resp.status != http.StatusCreated {
 		t.Fatalf("tax table: %d %s", resp.status, resp.body)
 	}
+	// The refusal moved past the missing table to the unpriced line: give the
+	// item a price (the consumer learns it from the event) and the same key
+	// must succeed — every refusal on the way is RETRYABLE and none was stored.
+	kafkatest.Produce(t, topicAvailability, availabilityEvent("evt-retry-tt", typeCreated, "sku-tt"))
+	priceOnceKnown(t, r.svc, "sku-tt", "k-price-tt")
 	retry := r.svc.call(t, "POST", "/price-quotes", key, quote)
 	if retry.status != http.StatusCreated || retry.header.Get("Idempotency-Replayed") != "" {
 		t.Fatalf("the retry under the released key = %d %v, want a fresh 201", retry.status, retry.header)
