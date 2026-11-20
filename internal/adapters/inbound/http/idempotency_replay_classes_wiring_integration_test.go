@@ -18,23 +18,25 @@ import (
 	"time"
 
 	httpadapter "github.com/IQVO/pricing/internal/adapters/inbound/http"
+	"github.com/IQVO/pricing/internal/adapters/outbound/clock"
 	"github.com/IQVO/pricing/internal/adapters/outbound/postgres"
 	"github.com/IQVO/pricing/internal/adapters/outbound/postgres/pgtx"
 	"github.com/IQVO/pricing/internal/application/ports"
 	"github.com/IQVO/pricing/internal/testing/pgtest"
 )
 
-// fixedClock is a ports.Clock frozen at t0 (the store only uses it to stamp the claim).
-type fixedClock struct{}
-
-func (fixedClock) Now() time.Time { return t0 }
+// fixedClock is gone: the claim's expiry compares created_at with the database
+// server's now(), so the wiring clock is the system clock (clock.System{}).
 
 // newReplayOps returns the six operations over ONE clean database per call.
 func newReplayOps(t *testing.T) replayOps {
 	t.Helper()
 	pool := pgtest.NewPool(t)
 	store := postgres.NewIdempotencyStore(pool)
-	clock := fixedClock{}
+	// The claim's expiry (created_at vs the database's now()) is checked by the
+	// server, so the clock must walk with real time: a clock frozen in the past
+	// makes every stored row look expired and the next claim takes it over.
+	var clk ports.Clock = clock.System{}
 	if _, err := pool.Exec(context.Background(), `CREATE TABLE replay_probe (tag text NOT NULL PRIMARY KEY)`); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +61,7 @@ func newReplayOps(t *testing.T) replayOps {
 			return rows
 		},
 		Middleware: func(_ *testing.T, next http.Handler) http.Handler {
-			return httpadapter.RequireIdempotencyKey(store, clock)(next)
+			return httpadapter.RequireIdempotencyKey(store, clk)(next)
 		},
 		Refuse: func(w http.ResponseWriter, r *http.Request, e problemEntry) {
 			httpadapter.WriteError(w, r, errs[e.Slug])
