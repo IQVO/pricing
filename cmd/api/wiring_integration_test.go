@@ -36,7 +36,8 @@ func money(n int) string { return fmt.Sprintf(`{"amountMinor":%d,"currency":"BRL
 func priceOnceKnown(t *testing.T, s *service, item, key string) {
 	t.Helper()
 	body := fmt.Sprintf(`{"catalogItemId":%q,"listPrice":%s}`, item, money(1000))
-	// A client error is stored under its key, so every attempt uses a fresh one.
+	// unknown-catalog-item is RETRYABLE (ADR 0011): the key is released, so one
+	// key would do; a fresh key per attempt keeps the wait observable anyway.
 	attempt := 0
 	eventually(t, 60*time.Second, "the consumed item to be known", func() bool {
 		attempt++

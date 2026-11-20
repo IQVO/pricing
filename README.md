@@ -192,8 +192,14 @@ fleet REST API guideline ([ADR 0008](docs/adr/0008-adopt-the-fleet-rest-api-guid
   characters, one fresh UUID per logical submit). A missing key is 400
   `idempotency-key-required`, a malformed one 400 `idempotency-key-invalid`. A
   retry with the same key, method, path and body replays the first answer byte
-  for byte with `Idempotency-Replayed: true`; the same key with another
-  request is 409 `idempotency-key-reused`. `PUT` is idempotent by method and
+  for byte with `Idempotency-Replayed: true` when that answer is final for the
+  request — a 2xx or a FINAL refusal; a RETRYABLE refusal (a concurrent-update
+  conflict, a not-yet-known catalogue item, no current schedule or tax table
+  yet, ...) is not stored and its key is released, so the retry executes again
+  and a different body under the released key is a new request
+  ([ADR 0011](docs/adr/0011-every-problem-type-has-a-replay-class.md)); the
+  same key with another request under a stored answer is 409
+  `idempotency-key-reused`. `PUT` is idempotent by method and
   takes no key.
 - `GET /item-prices` is keyset-paged: `limit` (1..500, default 100) and the
   opaque `cursor`, answering `{"items":[...],"nextCursor":"..."}`; follow
