@@ -83,3 +83,10 @@ of `GET /item-prices`, checkout's `POST /price-quotes`) change in their own pull
   page walk) on testcontainers, and `cmd/api` integration tests that drive the shipped binary (fresh key,
   byte-identical replay, 409 reuse on another body and on another route, missing key, 4xx cached, N concurrent
   requests with one key run once).
+
+## Update (2026-11-20)
+
+[ADR 0011](./0011-every-problem-type-has-a-replay-class.md) narrows this ADR's "A 2xx or a 4xx is stored"
+sentence of the Persistence decision: a 4xx is stored only when its problem type is FINAL or OUTCOME; a
+RETRYABLE refusal rolls back, key row included, and is not stored, so the key retries the real work. The
+text above is the decision as it was taken.
