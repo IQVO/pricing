@@ -1,8 +1,9 @@
 Feature: Writes are idempotent on the Idempotency-Key and errors are problem documents
-  The first response below 500 of a key is stored; the same key with the same
-  method, path and body replays it and nothing runs again. The same key with
-  another request is refused as a reuse (409). A key of more than 128 characters
-  is refused as malformed.
+  A 2xx is stored under its key and the same key with the same method, path and
+  body replays it; a refusal is stored only when its problem type is FINAL (or
+  OUTCOME); a RETRYABLE refusal is not stored and its key is released, so the
+  retry executes again (ADR 0011). The same key with another request is refused
+  as a reuse (409). A key of more than 128 characters is refused as malformed.
 
   Background:
     Given the catalogue item "sku-1" is known
