@@ -1,10 +1,12 @@
 // Package schedule is the DeliveryChargeSchedule aggregate: the delivery
-// charge of each service tier (SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD), with an
-// optional free-over threshold per tier. Exactly one schedule is CURRENT;
+// charge of each service tier (SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, and
+// optionally CONSOLIDATED), with an optional free-over threshold per tier. Exactly one schedule is CURRENT;
 // publishing a new one supersedes the previous in the same transaction (states
 // CURRENT -> SUPERSEDED, model-gap decision 4) and its version must strictly
 // increase (ErrNonIncreasingVersion). A schedule names a charge for every tier
-// (ErrIncompleteChargeSchedule). A new version supersedes, never edits.
+// (ErrIncompleteChargeSchedule) except CONSOLIDATED, which is free unless the
+// schedule declares a row for it (ADR 0010). A new version supersedes, never
+// edits.
 package schedule
 
 import (
@@ -19,8 +21,8 @@ import (
 const entity = "deliverychargeschedule"
 
 var (
-	// ErrIncompleteChargeSchedule: a schedule names a charge for every tier
-	// (422 incomplete-charge-schedule).
+	// ErrIncompleteChargeSchedule: a schedule names a charge for every classic
+	// tier (422 incomplete-charge-schedule).
 	ErrIncompleteChargeSchedule = errors.New("incomplete charge schedule")
 	// ErrNonIncreasingVersion: a new version is higher than the current one
 	// (409 non-increasing-version).
@@ -105,7 +107,7 @@ func orderTiers(tiers []TierCharge, currency string) ([]TierCharge, error) {
 	byTier := make(map[shared.Tier]TierCharge, len(tiers))
 	for _, tc := range tiers {
 		if !tc.Tier.Valid() {
-			return nil, shared.Invalid("tier %q is not one of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD", tc.Tier)
+			return nil, shared.Invalid("tier %q is not one of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, CONSOLIDATED", tc.Tier)
 		}
 		if _, dup := byTier[tc.Tier]; dup {
 			return nil, shared.Invalid("tier %s is named twice", tc.Tier)
@@ -128,6 +130,11 @@ func orderTiers(tiers []TierCharge, currency string) ([]TierCharge, error) {
 		}
 		out = append(out, tc)
 	}
+	// CONSOLIDATED is optional: kept only when the schedule declares it, so a
+	// schedule that omits it reads back (and is published) exactly as before.
+	if tc, ok := byTier[shared.TierConsolidated]; ok {
+		out = append(out, tc)
+	}
 	return out, nil
 }
 
@@ -143,7 +150,9 @@ func (s *DeliveryChargeSchedule) Supersede() error {
 
 // ChargeFor returns the delivery charge of a shipment group of the tier whose
 // goods are worth goods: zero when the tier has a free-over threshold and the
-// goods reach it, the tier charge otherwise.
+// goods reach it, the tier charge otherwise. CONSOLIDATED without a declared
+// row is free (a zero charge in the schedule's currency, ADR 0010); a declared
+// row is honoured like any other.
 func (s *DeliveryChargeSchedule) ChargeFor(tier shared.Tier, goods shared.Money) (shared.Money, error) {
 	for _, tc := range s.tiers {
 		if tc.Tier != tier {
@@ -154,7 +163,10 @@ func (s *DeliveryChargeSchedule) ChargeFor(tier shared.Tier, goods shared.Money)
 		}
 		return tc.Charge, nil
 	}
-	return shared.Money{}, shared.Invalid("tier %q is not one of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD", tier)
+	if tier == shared.TierConsolidated {
+		return shared.Money{AmountMinor: 0, Currency: s.tiers[0].Charge.Currency}, nil
+	}
+	return shared.Money{}, shared.Invalid("tier %q is not one of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, CONSOLIDATED", tier)
 }
 
 // Snapshot is the persisted form of a schedule.

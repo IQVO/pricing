@@ -64,6 +64,68 @@ Feature: A price quote prices exactly what checkout froze
     And the response field "groups.0.deliveryCharge.amountMinor" is 2490
     And the response field "totalMinor" is 102490
 
+  # ADR 0010: CONSOLIDATED is a known tier whose delivery charge is zero unless the
+  # current schedule declares a row for it. The Background schedule declares none.
+  Scenario: A CONSOLIDATED delivery is quoted free
+    Given a tax rate of 1000 basis points everywhere from version 1
+    When the API posts to "/price-quotes" the body:
+      """
+      {"cartId":"cart-1","destinationPostalPrefix":"787",
+       "lines":[{"catalogItemId":"sku-1","quantity":1},{"catalogItemId":"sku-2","quantity":1}],
+       "groups":[{"groupNo":1,"offerId":"offer-1","tier":"CONSOLIDATED","lineNos":[1]},
+                 {"groupNo":2,"offerId":"offer-2","tier":"STANDARD","lineNos":[2]}]}
+      """
+    Then the API answers 201
+    And the response field "groups.0.tier" is "CONSOLIDATED"
+    And the response field "groups.0.deliveryCharge.amountMinor" is 0
+    And the response field "groups.0.deliveryCharge.currency" is "BRL"
+    And the response field "groups.1.tier" is "STANDARD"
+    And the response field "groups.1.deliveryCharge.amountMinor" is 590
+    And the response field "taxMinor" is 189
+    And the response field "totalMinor" is 2079
+
+  Scenario: A quote of only CONSOLIDATED groups charges no delivery and stays readable
+    Given a tax rate of 0 basis points everywhere from version 1
+    When the API posts to "/price-quotes" the body:
+      """
+      {"cartId":"cart-1","destinationPostalPrefix":"787",
+       "lines":[{"catalogItemId":"sku-big","quantity":5}],
+       "groups":[{"groupNo":1,"offerId":"offer-1","tier":"CONSOLIDATED","lineNos":[1]}]}
+      """
+    Then the API answers 201
+    And the response field "groups.0.deliveryCharge.amountMinor" is 0
+    And the response field "totalMinor" is 100000
+    And I remember the response field "quoteId" as "consolidated"
+    When the API gets the quote remembered as "consolidated"
+    Then the response field "groups.0.tier" is "CONSOLIDATED"
+    And the response field "groups.0.deliveryCharge.amountMinor" is 0
+
+  Scenario Outline: A CONSOLIDATED row the schedule declares is honoured
+    Given a tax rate of 0 basis points everywhere from version 1
+    And the API accepts a POST to "/delivery-charge-schedules" with the body:
+      """
+      {"version":2,"tiers":[
+        {"tier":"SAME_DAY","charge":{"amountMinor":2490,"currency":"BRL"}},
+        {"tier":"NEXT_DAY","charge":{"amountMinor":1490,"currency":"BRL"}},
+        {"tier":"TWO_DAY","charge":{"amountMinor":990,"currency":"BRL"}},
+        {"tier":"STANDARD","charge":{"amountMinor":590,"currency":"BRL"}},
+        {"tier":"CONSOLIDATED","charge":{"amountMinor":390,"currency":"BRL"},"freeOver":{"amountMinor":20000,"currency":"BRL"}}]}
+      """
+    When the API posts to "/price-quotes" the body:
+      """
+      {"cartId":"cart-1","destinationPostalPrefix":"787",
+       "lines":[{"catalogItemId":"<item>","quantity":1}],
+       "groups":[{"groupNo":1,"offerId":"offer-1","tier":"CONSOLIDATED","lineNos":[1]}]}
+      """
+    Then the API answers 201
+    And the response field "groups.0.deliveryCharge.amountMinor" is <charge>
+    And the response field "totalMinor" is <total>
+
+    Examples: below the declared threshold, exactly at it
+      | item     | charge | total |
+      | sku-edge | 390    | 20389 |
+      | sku-big  | 0      | 20000 |
+
   Scenario: The free-over threshold is judged per group, not on the whole quote
     Given a tax rate of 0 basis points everywhere from version 1
     When the API posts to "/price-quotes" the body:

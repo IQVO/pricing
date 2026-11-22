@@ -38,7 +38,10 @@ See the [Runbook](/docs/operations/runbook) for the procedures and
 ## REST problem types
 
 Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
-(`internal/adapters/inbound/http/errors.go`).
+(`internal/adapters/inbound/http/errors.go`). Of the refusals, only the FINAL
+ones are stored under the Idempotency-Key; a RETRYABLE one releases the key, so
+retrying the identical request with the same key executes the work again
+(ADR 0011).
 
 | Status | Slug | Cause | Fix |
 | --- | --- | --- | --- |
@@ -46,7 +49,7 @@ Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
 | 400 | `idempotency-key-required` | A `POST` without an `Idempotency-Key` header | Send a unique key per logical request |
 | 400 | `idempotency-key-invalid` | An `Idempotency-Key` that is longer than 128 characters or has a byte outside printable ASCII | Send 1 to 128 printable ASCII characters, e.g. a UUID |
 | 400 | `invalid-limit` / `invalid-cursor` / `unknown-query-parameter` | `GET /item-prices` with a `limit` outside 1 to 500, a `cursor` that does not decode, or any parameter other than `limit` and `cursor` (the retired `after`, `offset`, `nextToken`, `from`) | Page with `limit` and the `nextCursor` of the previous page |
-| 409 | `idempotency-key-reused` | The same key with a different method, path or body (records live 24 h) | Use a new key, or resend the identical request to get the replay; this is a client bug, do not retry blindly |
+| 409 | `idempotency-key-reused` | The same key with a different method, path or body under a stored answer (a stored answer lives 24 h) | Use a new key, or resend the identical request to get the replay; this is a client bug, do not retry blindly |
 | 404 | `not-found` | Unknown item price, quote or sale id, or no current schedule or tax table on `GET .../current` | Create it first |
 | 409 | `overlapping-sale-window` | The new sale window overlaps a live one of the same item | Cancel the other sale or choose another window |
 | 409 | `non-increasing-version` | Published `version` of a schedule or tax table is not above the current one | Publish current version + 1 |
@@ -54,7 +57,7 @@ Errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>`
 | 409 | `illegal-transition` | A command on a `WITHDRAWN` price (set list price, schedule or cancel a sale, withdraw again) | A withdrawn price is never revived (ADR 0002 A3) |
 | 422 | `unknown-catalog-item` | The item is unknown or `DISCONTINUED` in the local `catalog_items` view | Check the offer-availability consumer is running and the `CatalogItemCreated` event arrived |
 | 422 | `sale-not-below-list` | A sale price is not below the list price, or a new list price is not above an existing sale price | Lower the sale or raise the list price |
-| 422 | `incomplete-charge-schedule` | A schedule does not name a charge for every tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`) | Add the missing tier |
+| 422 | `incomplete-charge-schedule` | A schedule does not name a charge for every classic tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`); `CONSOLIDATED` is optional | Add the missing tier |
 | 422 | `overlapping-tax-band` | Tax bands overlap | Make the prefix ranges disjoint |
 | 422 | `rate-out-of-range` | `rateBasisPoints` outside 0 to 10000 | Fix the rate |
 | 422 | `item-not-priced` | A quote line names an item with no price or a `WITHDRAWN` one | Publish the price (`POST /item-prices`) |

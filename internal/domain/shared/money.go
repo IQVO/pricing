@@ -59,18 +59,24 @@ func ValidCurrency(c string) bool {
 // Tier is a delivery-promise service tier.
 type Tier string
 
-// The four service tiers.
+// The service tiers: the four classic ones every schedule must charge, and
+// CONSOLIDATED (delivery-promise's opt-in tier), which is free unless a
+// schedule declares a charge for it (ADR 0010).
 const (
-	TierSameDay  Tier = "SAME_DAY"
-	TierNextDay  Tier = "NEXT_DAY"
-	TierTwoDay   Tier = "TWO_DAY"
-	TierStandard Tier = "STANDARD"
+	TierSameDay      Tier = "SAME_DAY"
+	TierNextDay      Tier = "NEXT_DAY"
+	TierTwoDay       Tier = "TWO_DAY"
+	TierStandard     Tier = "STANDARD"
+	TierConsolidated Tier = "CONSOLIDATED"
 )
 
-// Tiers lists the four tiers in speed order.
+// Tiers lists the four classic tiers in speed order: the tiers a schedule must
+// name a charge for. CONSOLIDATED is not among them (it is optional in a
+// schedule); see Tier.Valid.
 func Tiers() []Tier { return []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard} }
 
-// Valid reports whether t is one of the four tiers.
+// Valid reports whether t is a known tier: one of the four classic tiers or
+// CONSOLIDATED. Any other value is refused.
 func (t Tier) Valid() bool {
-	return t == TierSameDay || t == TierNextDay || t == TierTwoDay || t == TierStandard
+	return t == TierSameDay || t == TierNextDay || t == TierTwoDay || t == TierStandard || t == TierConsolidated
 }

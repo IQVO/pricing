@@ -118,6 +118,7 @@ classDiagram
         NEXT_DAY
         TWO_DAY
         STANDARD
+        CONSOLIDATED
     }
     class TaxTable {
         <<AggregateRoot>>

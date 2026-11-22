@@ -29,6 +29,12 @@ POST requires `Idempotency-Key`.
 
 - Error shape: RFC 9457 `application/problem+json`, `type` = `/problems/<slug>`;
   the mapping is the catalogue in `internal/adapters/inbound/http/errors.go`.
+- Replay classes (ADR 0011): every catalogue entry declares FINAL, OUTCOME or
+  RETRYABLE. A 2xx and a FINAL refusal are stored and replayed; a RETRYABLE
+  refusal is not stored and its key is released (the retry executes again; a
+  different body under the released key is a new request). No problem type of
+  this service is OUTCOME. A new catalogue entry without a class fails
+  `TestEveryProblemTypeDeclaresAReplayClass`.
 - A NUL character in a path, query or body is a client error (404 / 400), never a 500.
 - Auth: none. Fleet-wide REST+MCP auth was deliberately reverted 2026-09-11;
   `internal/architecture/fitness_test.go`'s TestNoAuthMiddlewareReintroduced guards it.

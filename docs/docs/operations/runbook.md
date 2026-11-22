@@ -220,9 +220,12 @@ migrations at boot.
 Tables: `item_prices`, `sale_windows`, `delivery_charge_schedules`,
 `tier_charges`, `tax_tables`, `tax_bands`, `price_quotes`, `quote_lines`,
 `quote_groups`, `catalog_items`, `processed_events`, `idempotency_keys`,
-`outbox_events`. Nothing purges `processed_events`, `idempotency_keys` (rows
-older than 24 hours are treated as absent but not deleted) or published
-`outbox_events` rows: plan retention if the volume matters.
+`outbox_events`. `idempotency_keys` is purged by the always-on background
+worker (a pass at boot, then hourly, batches of 1000): rows older than 24 h —
+already ignored by every read — are deleted oldest first with
+`FOR UPDATE SKIP LOCKED`, so a row a request holds is skipped, never waited
+for. Nothing purges `processed_events` or published `outbox_events` rows:
+plan retention if the volume matters.
 
 ## Routine procedures
 

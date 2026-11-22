@@ -2,6 +2,7 @@ package quote_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -447,5 +448,96 @@ func TestRestoreRefusesCorruptSnapshots(t *testing.T) {
 	}
 	if !quote.StateIssued.Valid() || !quote.StateExpired.Valid() || quote.State("").Valid() {
 		t.Error("State.Valid() is wrong")
+	}
+}
+
+func TestIssueAcceptsTheGroupCeiling(t *testing.T) {
+	in := input()
+	in.Lines = make([]quote.LineInput, quote.MaxGroups)
+	in.Groups = make([]quote.GroupInput, quote.MaxGroups)
+	for i := range in.Lines {
+		in.Lines[i] = line("i"+string(rune('a'+i/26))+string(rune('a'+i%26)), 1, 100)
+		in.Groups[i] = quote.GroupInput{GroupNo: i + 1, OfferID: "o", Tier: shared.TierStandard, LineNos: []int{i + 1}}
+	}
+	if got := len(mustIssue(t, in).Groups()); got != quote.MaxGroups {
+		t.Errorf("groups = %d, want %d", got, quote.MaxGroups)
+	}
+}
+
+func TestIssueNamesTheLineThatIsInNoGroup(t *testing.T) {
+	in := input()
+	in.Groups = []quote.GroupInput{{GroupNo: 1, OfferID: "off-1", Tier: shared.TierNextDay, LineNos: []int{2}}}
+	_, _, err := quote.Issue(in, sched(t), table(t))
+	if !errors.Is(err, shared.ErrValidation) {
+		t.Fatalf("Issue() = %v, want ErrValidation", err)
+	}
+	if want := "line 1 is in no group"; !strings.Contains(err.Error(), want) {
+		t.Errorf("Issue() = %q, want it to say %q", err, want)
+	}
+}
+
+func TestRestoreNamesTheOffendingLine(t *testing.T) {
+	s := mustIssue(t, input()).Snapshot()
+	s.Lines[1].LineNo = 5
+	_, err := quote.Restore(s)
+	if !errors.Is(err, shared.ErrInvalidSnapshot) {
+		t.Fatalf("Restore() = %v, want ErrInvalidSnapshot", err)
+	}
+	if want := "line 2:"; !strings.Contains(err.Error(), want) {
+		t.Errorf("Restore() = %q, want it to name %q", err, want)
+	}
+}
+
+// rebalance makes a hand-edited snapshot consistent again: every line total is
+// unit price times quantity and the quote total is goods plus delivery plus tax.
+func rebalance(s *quote.Snapshot) {
+	total := s.TaxMinor
+	for i := range s.Lines {
+		s.Lines[i].LineTotal = brl(s.Lines[i].UnitPrice.AmountMinor * int64(s.Lines[i].Quantity))
+		total += s.Lines[i].LineTotal.AmountMinor
+	}
+	for _, g := range s.Groups {
+		total += g.DeliveryCharge.AmountMinor
+	}
+	s.TotalMinor = total
+}
+
+func TestRestoreAcceptsEveryBoundary(t *testing.T) {
+	cases := map[string]func(*quote.Snapshot){
+		"schedule version one":  func(s *quote.Snapshot) { s.ScheduleVersion = 1 },
+		"tax table version one": func(s *quote.Snapshot) { s.TaxTableVersion = 1 },
+		"no tax":                func(s *quote.Snapshot) { s.TaxMinor = 0 },
+		"price version one":     func(s *quote.Snapshot) { s.Lines[0].PriceVersion = 1 },
+		"quantity one":          func(s *quote.Snapshot) { s.Lines[0].Quantity = 1 },
+		"quantity ceiling":      func(s *quote.Snapshot) { s.Lines[0].Quantity = quote.MaxQuantity },
+		"line ceiling": func(s *quote.Snapshot) {
+			s.Lines = make([]quote.Line, quote.MaxLines)
+			for i := range s.Lines {
+				s.Lines[i] = quote.Line{
+					LineNo: i + 1, CatalogItemID: "i" + string(rune('a'+i/26)) + string(rune('a'+i%26)),
+					Quantity: 1, PriceVersion: 1, UnitPrice: brl(1),
+				}
+			}
+		},
+		"group ceiling": func(s *quote.Snapshot) {
+			s.Groups = make([]quote.Group, quote.MaxGroups)
+			for i := range s.Groups {
+				s.Groups[i] = quote.Group{GroupNo: i + 1, Tier: shared.TierStandard, DeliveryCharge: brl(500)}
+			}
+		},
+		"group number ceiling": func(s *quote.Snapshot) { s.Groups[0].GroupNo = shared.MaxInt32 },
+	}
+	for name, mutate := range cases {
+		s := mustIssue(t, input()).Snapshot()
+		mutate(&s)
+		rebalance(&s)
+		r, err := quote.Restore(s)
+		if err != nil {
+			t.Errorf("%s: Restore() = %v, want it accepted", name, err)
+			continue
+		}
+		if got := r.Snapshot(); got.TotalMinor != s.TotalMinor || len(got.Lines) != len(s.Lines) || len(got.Groups) != len(s.Groups) {
+			t.Errorf("%s: round trip changed the quote: %+v", name, got)
+		}
 	}
 }

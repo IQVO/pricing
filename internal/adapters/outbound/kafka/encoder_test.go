@@ -7,6 +7,7 @@ import (
 
 	"github.com/IQVO/pricing/internal/adapters/outbound/kafka"
 	"github.com/IQVO/pricing/internal/application/outbox"
+	"github.com/IQVO/pricing/internal/domain/schedule"
 	"github.com/IQVO/pricing/internal/domain/shared"
 )
 
@@ -36,6 +37,16 @@ func TestItemPriceWithdrawnGolden(t *testing.T) {
 func TestDeliveryChargeScheduleChangedGolden(t *testing.T) {
 	msg := encodeOne(t, scheduleChanged())
 	assertGolden(t, "DeliveryChargeScheduleChanged", msg.Value)
+	assertEnvelope(t, msg, "deliverychargeschedule", "DeliveryChargeScheduleChanged", "sched-1", kafka.TopicEvents)
+}
+
+// A schedule that declares CONSOLIDATED carries the fifth row, last; a schedule
+// that does not is the unchanged DeliveryChargeScheduleChanged golden above (ADR 0010).
+func TestDeliveryChargeScheduleChangedWithAConsolidatedRowGolden(t *testing.T) {
+	ev := scheduleChanged()
+	ev.Tiers = append(ev.Tiers, schedule.TierCharge{Tier: shared.TierConsolidated, Charge: shared.Money{AmountMinor: 390, Currency: "BRL"}})
+	msg := encodeOne(t, ev)
+	assertGolden(t, "DeliveryChargeScheduleChangedWithConsolidated", msg.Value)
 	assertEnvelope(t, msg, "deliverychargeschedule", "DeliveryChargeScheduleChanged", "sched-1", kafka.TopicEvents)
 }
 

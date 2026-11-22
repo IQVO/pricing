@@ -6,7 +6,7 @@ Feature: The REST contract stores first answers, bounds its pages and rejects ma
   Background:
     Given the catalogue item "sku-1" is known
 
-  Scenario: The first answer below 500 is stored, a refusal included, and replayed under its key
+  Scenario: A retryable refusal is not stored; its key retries the work once the fact arrives
     When the API posts to "/item-prices" with Idempotency-Key "late-key" the body:
       """
       {"catalogItemId":"sku-late","listPrice":{"amountMinor":1000,"currency":"BRL"}}
@@ -17,14 +17,27 @@ Feature: The REST contract stores first answers, bounds its pages and rejects ma
       """
       {"catalogItemId":"sku-late","listPrice":{"amountMinor":1000,"currency":"BRL"}}
       """
-    Then the API answers 422 with problem "unknown-catalog-item"
-    And the response is marked replayed
-    When the API posts to "/item-prices" with Idempotency-Key "fresh-key" the body:
+    Then the API answers 201
+    And the response is not marked replayed
+    When the API posts to "/item-prices" with Idempotency-Key "late-key" the body:
       """
       {"catalogItemId":"sku-late","listPrice":{"amountMinor":1000,"currency":"BRL"}}
       """
     Then the API answers 201
-    And the response is not marked replayed
+    And the response is marked replayed
+
+  Scenario: A final refusal is stored and replayed under its key
+    When the API posts to "/item-prices" with Idempotency-Key "neg-key" the body:
+      """
+      {"catalogItemId":"sku-1","listPrice":{"amountMinor":-1,"currency":"BRL"}}
+      """
+    Then the API answers 422 with problem "negative-amount"
+    When the API posts to "/item-prices" with Idempotency-Key "neg-key" the body:
+      """
+      {"catalogItemId":"sku-1","listPrice":{"amountMinor":-1,"currency":"BRL"}}
+      """
+    Then the API answers 422 with problem "negative-amount"
+    And the response is marked replayed
 
   Scenario: An Idempotency-Key of exactly 128 characters is accepted
     When the API posts to "/item-prices" with an Idempotency-Key of 128 characters the body:

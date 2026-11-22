@@ -60,6 +60,8 @@ Feature: A delivery charge schedule names every tier and supersedes, never edits
       |                                                 | incomplete-charge-schedule  |
       | SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, STANDARD | validation-failed           |
       | SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, OVERNIGHT | validation-failed          |
+      | SAME_DAY, NEXT_DAY, TWO_DAY, CONSOLIDATED       | incomplete-charge-schedule  |
+      | SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD, CONSOLIDATED, CONSOLIDATED | validation-failed |
 
   Scenario: Every amount of a schedule is non-negative and in the configured currency
     When the API posts to "/delivery-charge-schedules" the body:
@@ -109,6 +111,22 @@ Feature: A delivery charge schedule names every tier and supersedes, never edits
     And the response has no field "tiers.2.freeOver"
     And the response field "tiers.3.tier" is "STANDARD"
     And the response field "tiers.3.freeOver.amountMinor" is 10000
+
+  # ADR 0010: CONSOLIDATED is optional in a schedule; only a declared row is stored and served.
+  Scenario: A schedule may declare a CONSOLIDATED row and serves it last
+    When the API publishes a charge schedule of version 1 naming the tiers "CONSOLIDATED, STANDARD, TWO_DAY, NEXT_DAY, SAME_DAY"
+    Then the API answers 201
+    And the response field "tiers.4.tier" is "CONSOLIDATED"
+    And the response field "tiers.4.charge.amountMinor" is 500
+    And 1 "DeliveryChargeScheduleChanged" events were published
+
+  Scenario: A schedule that does not name CONSOLIDATED serves exactly the four classic tiers
+    When the API publishes a charge schedule of version 1 naming the tiers "SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD"
+    Then the API answers 201
+    And the response field "tiers.3.tier" is "STANDARD"
+    And the response has no field "tiers.4"
+    When the API gets "/delivery-charge-schedules/current"
+    Then the response has no field "tiers.4"
 
   Scenario: A replayed publication does nothing twice and the same version under a new key is refused
     When the API posts to "/delivery-charge-schedules" with Idempotency-Key "pub-1" the body:

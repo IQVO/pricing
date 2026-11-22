@@ -13,8 +13,10 @@ import (
 const createBody = `{"catalogItemId":"sku-1","listPrice":{"amountMinor":1000,"currency":"BRL"}}`
 
 // A 5xx is never stored: the retry with the same key runs the handler again,
-// and only then is the answer stored and replayed.
-func TestServerErrorIsNotStored(t *testing.T) {
+// and only then is the answer stored and replayed. (The rendered fleet template
+// carries the same proof as TestServerErrorIsNotStored; this one keeps the
+// direct middleware-without-router variation.)
+func TestServerErrorIsNotStoredOverTheBareMiddleware(t *testing.T) {
 	clock := memory.NewClock(t0)
 	var calls int
 	handler := httpadapter.RequireIdempotencyKey(memory.NewStore(clock).Idempotency(), clock)(http.HandlerFunc(
@@ -101,14 +103,28 @@ func TestPutNeedsNoIdempotencyKey(t *testing.T) {
 	}
 }
 
-func TestIdempotencyRecordsClientErrorsNotServerErrors(t *testing.T) {
+// A RETRYABLE client error (unknown-catalog-item, ADR 0011) is not stored: the
+// key is released and the retry executes again once the fact arrives; a FINAL
+// one (negative-amount) is stored and replayed.
+func TestClientErrorsFollowTheirReplayClass(t *testing.T) {
 	e := newEnv(t)
 	bad := e.do(http.MethodPost, "/item-prices", "k2", createBody)
 	e.wantProblem(bad, http.StatusUnprocessableEntity, "unknown-catalog-item")
 	e.catalogued("sku-1")
-	// The client error was stored: the key replays it even though the item exists now.
 	again := e.do(http.MethodPost, "/item-prices", "k2", createBody)
-	e.wantProblem(again, http.StatusUnprocessableEntity, "unknown-catalog-item")
+	e.wantStatus(again, http.StatusCreated)
+	if again.Header.Get("Idempotency-Replayed") != "" {
+		t.Fatalf("the retry of a released key ran again: %v", again.Header)
+	}
+
+	negative := `{"catalogItemId":"sku-1","listPrice":{"amountMinor":-1,"currency":"BRL"}}`
+	first := e.do(http.MethodPost, "/item-prices", "k3", negative)
+	e.wantProblem(first, http.StatusUnprocessableEntity, "negative-amount")
+	stored := e.do(http.MethodPost, "/item-prices", "k3", negative)
+	e.wantProblem(stored, http.StatusUnprocessableEntity, "negative-amount")
+	if stored.Header.Get("Idempotency-Replayed") != "true" || stored.Body != first.Body {
+		t.Fatalf("a FINAL refusal must replay byte for byte: %v %q vs %q", stored.Header, stored.Body, first.Body)
+	}
 }
 
 func TestOversizedBodyIsMalformed(t *testing.T) {

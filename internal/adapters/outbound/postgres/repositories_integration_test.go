@@ -31,7 +31,7 @@ func (e *stubEncoder) Encode(events ...shared.Event) ([]outbox.Message, error) {
 }
 
 func TestPostgresHonoursTheRepositoryContract(t *testing.T) {
-	repocontract.Run(t, func(t *testing.T) repocontract.Env {
+	newEnv := func(t *testing.T) repocontract.Env {
 		pool := pgtest.NewPool(t)
 		return repocontract.Env{
 			ItemPrices: postgres.NewItemPriceRepository(pool), Schedules: postgres.NewScheduleRepository(pool),
@@ -42,6 +42,15 @@ func TestPostgresHonoursTheRepositoryContract(t *testing.T) {
 			// The store judges TTL with the database's now(); the contract
 			// stamps records with this wall clock.
 			Clock: wallClock{},
+			// Age moves created_at back instead (the store's clock is the
+			// database's now(), which no test can advance).
+			Age: func(t *testing.T, d time.Duration) {
+				t.Helper()
+				if _, err := pool.Exec(context.Background(),
+					`UPDATE idempotency_keys SET created_at = created_at - make_interval(secs => $1)`, d.Seconds()); err != nil {
+					t.Fatal(err)
+				}
+			},
 			OutboxCount: func(t *testing.T) int {
 				var n int
 				if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM outbox_events`).Scan(&n); err != nil {
@@ -50,7 +59,9 @@ func TestPostgresHonoursTheRepositoryContract(t *testing.T) {
 				return n
 			},
 		}
-	})
+	}
+	repocontract.Run(t, newEnv)
+	repocontract.RunIdempotencyPurge(t, newEnv)
 }
 
 // wallClock is the real time, for the Postgres side of the contract.

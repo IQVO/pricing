@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/IQVO/pricing/internal/application/idempotency"
@@ -63,11 +64,39 @@ func (i *IdempotencyStore) Do(ctx context.Context, key, requestHash string, at t
 	if err != nil {
 		return idempotency.Record{}, false, err
 	}
-	if rec.Status >= http.StatusInternalServerError {
+	if rec.Release || rec.Status >= http.StatusInternalServerError {
+		// rolled back by the deferred restore: a released answer and a 5xx are
+		// never stored, so the key runs again (ADR 0011).
 		return rec, false, nil
 	}
 	rec.RequestHash, rec.CreatedAt = requestHash, at
 	i.s.idempotency[key] = rec
 	stored = true
 	return rec, false, nil
+}
+
+// PurgeExpired implements ports.IdempotencyStore: it deletes at most limit
+// records older than idempotency.TTL — the exact complement of Do's live check
+// on the same clock — oldest first, and returns how many. Do holds the same
+// mutex while it runs fn, so a purge waits for a request in flight and then
+// finds its answer live; nothing a request can still replay is ever deleted.
+func (i *IdempotencyStore) PurgeExpired(_ context.Context, limit int) (int, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	var expired []string
+	for key, rec := range i.s.idempotency {
+		if i.s.now().Sub(rec.CreatedAt) > idempotency.TTL {
+			expired = append(expired, key)
+		}
+	}
+	sort.Slice(expired, func(a, b int) bool {
+		return i.s.idempotency[expired[a]].CreatedAt.Before(i.s.idempotency[expired[b]].CreatedAt)
+	})
+	if limit < len(expired) {
+		expired = expired[:max(limit, 0)]
+	}
+	for _, key := range expired {
+		delete(i.s.idempotency, key)
+	}
+	return len(expired), nil
 }

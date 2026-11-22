@@ -192,6 +192,19 @@ func OutboxRowState(t *testing.T, pool *pgxpool.Pool, id int64) (attempts int, l
 	return attempts, lastErr, published
 }
 
+// Pool returns a pool on url (a database this package handed out, say the one
+// behind the service under test), closed with the test. NewPool is the fresh-
+// database variant above; this one shares the service's database.
+func Pool(t *testing.T, url string) *pgxpool.Pool {
+	t.Helper()
+	pool, err := postgres.NewPool(context.Background(), url)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
 // EventProcessed reports whether the consumer inbox of the database at dsn has
 // claimed the CloudEvents id (a consumed event was applied or skipped).
 func EventProcessed(t *testing.T, dsn, eventID string) bool {
