@@ -5,13 +5,17 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 )
 
 // fakePurger answers PurgeExpired from a script (the last answer repeats),
 // records the limits it was called with, and can fail or act once per call.
+// Every field is guarded: the worker goroutine and the test read it
+// concurrently (the race detector watches).
 type fakePurger struct {
+	mu      sync.Mutex
 	script  []int
 	errAt   int // a call index that answers errBoom instead (0 = never)
 	errBoom error
@@ -21,6 +25,8 @@ type fakePurger struct {
 }
 
 func (f *fakePurger) PurgeExpired(_ context.Context, limit int) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	i := f.calls
 	f.calls++
 	f.limits = append(f.limits, limit)
@@ -34,6 +40,13 @@ func (f *fakePurger) PurgeExpired(_ context.Context, limit int) (int, error) {
 		i = len(f.script) - 1
 	}
 	return f.script[i], nil
+}
+
+// count is how many calls happened so far.
+func (f *fakePurger) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
 }
 
 func quietLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
@@ -86,10 +99,10 @@ func TestStartIdempotencyPurgeRunsThenStops(t *testing.T) {
 	w, stop := startIdempotencyPurge(f, quietLogger())
 	defer stop()
 	deadline := time.Now().Add(5 * time.Second)
-	for f.calls == 0 && time.Now().Before(deadline) {
+	for f.count() == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond) // the first pass runs at once, asynchronously
 	}
-	if f.calls < 1 {
+	if f.count() < 1 {
 		t.Fatal("the purge worker never ran a pass")
 	}
 	stop()
