@@ -132,7 +132,7 @@ func (u ExpireQuotes) Execute(ctx context.Context) (int, error) {
 		case err == nil:
 			expired++
 		case errors.Is(err, ports.ErrNotFound), errors.Is(err, ports.ErrConcurrentUpdate), errors.Is(err, shared.ErrIllegalTransition):
-			u.logger().WarnContext(ctx, "quote expiry skipped", "quote_id", string(id), "error", err)
+			u.logger().WarnContext(ctx, "quote expiry skipped", "quote_id", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		default:
 			return expired, err
 		}
