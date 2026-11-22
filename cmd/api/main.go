@@ -118,7 +118,8 @@ func run(ctx context.Context) error {
 	consumers, closeConsumers := startConsumers(ad, rt, logger)
 	relay, closeRelay := startOutboxRelay(ad.outbox, rt.brokers, logger)
 	policies, closePolicies := startPolicies(ad.deps, logger)
-	return serveUntilSignal(ctx, logger, httpServer, readiness, consumers, closeConsumers, relay, closeRelay, policies, closePolicies)
+	purge, closePurge := startIdempotencyPurge(ad.idempotency, logger)
+	return serveUntilSignal(ctx, logger, httpServer, readiness, consumers, closeConsumers, relay, closeRelay, policies, closePolicies, purge, closePurge)
 }
 
 // newReadiness builds the /readyz gate: the drain gate plus a Postgres ping and
@@ -264,11 +265,13 @@ func startOutboxRelay(store outboxrelay.Store, brokers []string, logger *slog.Lo
 
 // serveUntilSignal runs httpServer until SIGINT/SIGTERM (or a listen error),
 // then shuts down in the fleet order: (1) /readyz flips to 503, (2) wait the
-// drain delay, (3) drain HTTP, (4) stop and await the consumers and the policy loop, (5) stop and
-// await the relay LAST so nothing committed above is stranded; the caller's
-// deferred pool.Close runs after all of it.
+// drain delay, (3) drain HTTP, (4) stop and await the consumers, the policy
+// loop and the idempotency purge, (5) stop and await the relay LAST so nothing
+// committed above is stranded; the caller's deferred pool.Close runs after all
+// of it.
 func serveUntilSignal(ctx context.Context, logger *slog.Logger, httpServer *http.Server, readiness *inboundhttp.Readiness,
 	consumers []*worker, closeConsumers func(), relay *worker, closeRelay func(), policies *worker, closePolicies func(),
+	purge *worker, closePurge func(),
 ) error {
 	errCh := make(chan error, 1)
 	go func() {
@@ -280,11 +283,12 @@ func serveUntilSignal(ctx context.Context, logger *slog.Logger, httpServer *http
 
 	sigCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	died := watchWorkers(append([]*worker{relay, policies}, consumers...)...)
+	died := watchWorkers(append([]*worker{relay, policies, purge}, consumers...)...)
 	select {
 	case err := <-errCh:
 		closeConsumers()
 		closePolicies()
+		closePurge()
 		closeRelay()
 		return err
 	case name := <-died:
@@ -293,6 +297,7 @@ func serveUntilSignal(ctx context.Context, logger *slog.Logger, httpServer *http
 		// with a dead worker, so exit non-zero and let the orchestrator restart it.
 		closeConsumers()
 		closePolicies()
+		closePurge()
 		closeRelay()
 		return fmt.Errorf("%s stopped unexpectedly: exiting so the orchestrator restarts the service", name)
 	case <-sigCtx.Done():
@@ -313,6 +318,8 @@ func serveUntilSignal(ctx context.Context, logger *slog.Logger, httpServer *http
 	}
 	closePolicies()
 	await(logger, policies)
+	closePurge()
+	await(logger, purge)
 	closeRelay()
 	await(logger, relay)
 	return err
