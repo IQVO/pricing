@@ -241,6 +241,12 @@ a2a:
       cpu: 100m
       memory: 128Mi
 
+# capacity step 3 (warehouse-infra ADR 0012): true (with mcp.enabled and a2a.enabled) runs cmd/mcp and cmd/a2a as
+# two containers of one <release>-agents Deployment. Off by default; warehouse-infra switches it on.
+agents:
+  colocate: false
+  strategy: {}   # {} = k8s default (RollingUpdate); {type: Recreate} only when no surge slot is free
+
 # MCP (Model Context Protocol) server (cmd/mcp, ADR 0009): a READ-ONLY inbound
 # adapter over the same query use cases as the REST GET routes and the A2A
 # skills. Tools: get_item_price and get_price_quote (both authority L1), plus one
