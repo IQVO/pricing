@@ -53,6 +53,22 @@ const readSQL = `
 	SELECT request_hash, status, content_type, body, created_at FROM idempotency_keys
 	WHERE route = '' AND key = $1 AND created_at > now() - make_interval(secs => $2)`
 
+// purgeSQL deletes one bounded batch of the rows the read check above already
+// ignores: created_at <= now() - TTL is the exact complement of readSQL's
+// created_at > now() - TTL, on the same ttlSeconds() age (idempotency.TTL is
+// the one age of the read check, the claim takeover and this purge). The rows
+// are picked FOR UPDATE SKIP LOCKED, so a row a request holds (its claim took
+// the expired row over and refreshes created_at under the row lock until it
+// commits) is skipped, never waited for, and the age test runs on the locked
+// rows, so a row a request just refreshed is never picked. It takes no
+// advisory lock and never blocks a request: an expired row is invisible to Do,
+// so deleting it is not observable.
+const purgeSQL = `DELETE FROM idempotency_keys
+	WHERE (route, key) IN (
+		SELECT route, key FROM idempotency_keys
+		WHERE created_at <= now() - make_interval(secs => $1)
+		ORDER BY created_at LIMIT $2 FOR UPDATE SKIP LOCKED)`
+
 // Do implements ports.IdempotencyStore: the claim, fn's writes (through the
 // transaction carried by the ctx it is handed, so every unit of work joins it)
 // and the stored answer commit together.
@@ -147,4 +163,18 @@ func (s *IdempotencyStore) replay(ctx context.Context, key string) (rec idempote
 	}
 	rec.CreatedAt = rec.CreatedAt.UTC()
 	return rec, true, false, nil
+}
+
+// PurgeExpired implements ports.IdempotencyStore: it deletes at most limit
+// rows older than idempotency.TTL, oldest first (idempotency_keys_created_idx),
+// and returns how many. A result below limit means nothing expired is left.
+func (s *IdempotencyStore) PurgeExpired(ctx context.Context, limit int) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+	tag, err := s.pool.Exec(ctx, purgeSQL, ttlSeconds(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("idempotency purge: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }
