@@ -158,7 +158,9 @@ func serveOnce(t *testing.T, ctx context.Context, consumers []*worker, relay, po
 	readiness := inboundhttp.NewReadiness(0, 0)
 	srv := &http.Server{Addr: "127.0.0.1:0", Handler: http.NotFoundHandler(), ReadHeaderTimeout: time.Second}
 	closed := 0
-	err := serveUntilSignal(ctx, slog.New(slog.NewTextHandler(&buf, nil)), srv, readiness, consumers, func() { closed++ }, relay, func() { closed++ }, policies, func() { closed++ })
+	// The purge worker is nil here: its loop is covered by retention_test.go;
+	// serveUntilSignal and await treat a nil worker as a no-op.
+	err := serveUntilSignal(ctx, slog.New(slog.NewTextHandler(&buf, nil)), srv, readiness, consumers, func() { closed++ }, relay, func() { closed++ }, policies, func() { closed++ }, nil, func() { closed++ })
 	if closed == 0 {
 		t.Fatal("the workers must be closed on every exit path")
 	}
@@ -199,7 +201,7 @@ func TestServeUntilSignalReturnsAListenError(t *testing.T) {
 	defer taken.Close()
 	srv := &http.Server{Addr: strings.TrimPrefix(taken.URL, "http://"), Handler: http.NotFoundHandler(), ReadHeaderTimeout: time.Second}
 	relay := &worker{name: "relay", done: make(chan struct{})}
-	err := serveUntilSignal(context.Background(), quiet(), srv, inboundhttp.NewReadiness(0, 0), nil, func() {}, relay, func() {}, &worker{name: "policies", done: make(chan struct{})}, func() {})
+	err := serveUntilSignal(context.Background(), quiet(), srv, inboundhttp.NewReadiness(0, 0), nil, func() {}, relay, func() {}, &worker{name: "policies", done: make(chan struct{})}, func() {}, nil, func() {})
 	if err == nil {
 		t.Fatal("binding a taken port must fail")
 	}

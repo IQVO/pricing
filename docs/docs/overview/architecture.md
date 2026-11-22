@@ -135,7 +135,7 @@ embedded migration `0001_pricing_schema` in
 | `price_quotes`, `quote_lines`, `quote_groups` | Quotes, with an index on `expires_at` for `ISSUED` rows |
 | `catalog_items` | The local CatalogItemView (`ACTIVE` or `DISCONTINUED`) |
 | `processed_events` | Inbox: the CloudEvents ids already applied |
-| `idempotency_keys` | First response per route and key, 24 h |
+| `idempotency_keys` | First response per route and key, kept 24 h and then purged hourly by the background worker |
 | `outbox_events` | Encoded CloudEvents awaiting the relay, with `attempts` and `last_error` |
 
 There is no cache, no search index and no second database. Kafka holds no

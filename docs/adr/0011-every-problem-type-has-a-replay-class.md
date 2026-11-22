@@ -138,3 +138,26 @@ Outside the replay decision (never reach it): `idempotency-key-required` /
 - Retention: expired `idempotency_keys` rows are still only skipped, never deleted —
   unchanged by this ADR; recorded as an open point (a purge sweep is a separate change,
   see order-sourcing #84 / last-mile-delivery #86 for the shape).
+
+## Addendum (2026-11-22): the retention open point is closed
+
+The open point above is fixed by PR #57 (`fix(idempotency): purge expired key
+rows`), following the merged fleet pattern (order-sourcing #84,
+last-mile-delivery #86). Nothing above changes: expiry stays enforced at read
+(`created_at > now() - TTL` in the replay SELECT) and by claim takeover, both on
+the one `idempotency.TTL` (24 h) that also bounds the purge. What is added:
+
+- `ports.IdempotencyStore.PurgeExpired(ctx, limit)` deletes at most `limit` rows
+  with `created_at <= now() - TTL` — the exact complement of the read check —
+  oldest first, `ORDER BY created_at LIMIT n FOR UPDATE SKIP LOCKED`: a row a
+  request holds (its claim took the expired row over and refreshes
+  `created_at` under the row lock) is skipped, never waited for. No advisory
+  lock, and nothing a request can still replay is ever deleted, so the purge is
+  not observable by any request.
+- `cmd/api` runs it as an always-on background worker (like the relay and the
+  policies): a pass at boot, then hourly, in batches of 1000 until a batch comes
+  back short. Interval and batch are fixed constants, not configuration: the
+  age is `idempotency.TTL`, the rest is housekeeping.
+- The in-memory double purges with the same semantics on its own clock (the
+  complement of its live check), and both adapters run a shared
+  `repocontract.RunIdempotencyPurge` contract suite.

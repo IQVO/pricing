@@ -33,6 +33,11 @@ type Env struct {
 	// the implementation under test judges TTL with (the memory double is
 	// driven by a frozen clock; the Postgres store by the database's now()).
 	Clock ports.Clock
+	// Age makes every record stored so far d older, the only way a test
+	// reaches an expired record without waiting a day: the memory double
+	// advances its clock, the Postgres runner moves created_at back. The
+	// idempotency purge suite (testIdempotencyPurge) needs it.
+	Age func(t *testing.T, d time.Duration)
 	// OutboxCount returns how many events the outbox holds.
 	OutboxCount func(t *testing.T) int
 }
