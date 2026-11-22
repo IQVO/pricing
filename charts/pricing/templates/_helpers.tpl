@@ -57,6 +57,15 @@ Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 000
 {{- include "pricing.fullname" . }}-a2a
 {{- end }}
 
+{{/* agents.colocate (warehouse-infra ADR 0012): "true" iff colocate, mcp and a2a are all on; else empty. */}}
+{{- define "pricing.agentsColocated" -}}
+{{- if and (.Values.agents | default dict).colocate .Values.mcp.enabled .Values.a2a.enabled }}true{{ end -}}
+{{- end }}
+
+{{- define "pricing.agentsFullname" -}}
+{{- printf "%s-agents" (include "pricing.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 Fully qualified name of the MCP server Deployment/Service (<release>-mcp, ADR 0009).
 */}}
