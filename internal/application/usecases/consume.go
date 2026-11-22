@@ -108,7 +108,7 @@ func (u PublishBoundaries) Execute(ctx context.Context) (int, error) {
 		case err == nil:
 			handled++
 		case errors.Is(err, ports.ErrNotFound), errors.Is(err, ports.ErrConcurrentUpdate), errors.Is(err, shared.ErrIllegalTransition):
-			u.logger().WarnContext(ctx, "boundary publication skipped", "catalog_item_id", string(id), "error", err)
+			u.logger().WarnContext(ctx, "boundary publication skipped", "catalog_item_id", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		default:
 			return handled, err
 		}
